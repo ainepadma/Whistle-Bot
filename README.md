@@ -19,7 +19,8 @@
 
 ## 打开 / 隐藏 / 关闭
 
-- **打开**：双击 `release/` 里的便携版或安装后的应用即可；以后每次开机手动启动
+- **打开**：从本仓库 [Releases](../../releases) 下载便携版或安装版并运行；
+  以后每次开机手动启动
 - **隐藏**：点击屏幕右上角控制条的 🙈 按钮，或托盘菜单「显示 / 隐藏宠物」
 - **重新打开**：按 `Ctrl+Alt+P`，或点击任务栏通知区的托盘图标
 - **退出**：点击右上角 ✖️ 按钮，或托盘菜单「退出」
@@ -44,7 +45,8 @@ npm run build:win           # Windows 便携版
 npm run build:win:installer # Windows 安装包
 ```
 
-构建产物位于 `electron/dist/`，并同步复制到根目录 `release/`。
+构建产物位于 `electron/dist/`，并同步复制到本地根目录 `release/`（不入库，
+发布时作为 GitHub Release 附件上传）。
 
 ## 目录
 
@@ -53,11 +55,15 @@ npm run build:win:installer # Windows 安装包
 │   ├── vscode-pets/  # 桌宠应用源码（主进程、渲染页、宠物素材）
 │   ├── build/        # 应用图标
 │   └── package.json
-├── release/          # Windows 安装包 & 便携版
-├── third_party/      # vscode-pets 上游源码（只读参考）
+├── release/          # 本地构建产物（不入库，见 GitHub Releases）
+├── third_party/      # 本地参考：vscode-pets 上游源码（不入库，需自行 clone）
+├── LICENSE
+├── THIRD_PARTY_NOTICES.md
 └── README.md
 ```
 
 ## License
 
-MIT。上游 vscode-pets 为 MIT 协议。
+本仓库代码基于 MIT 协议（见 [LICENSE](LICENSE)）；
+上游 vscode-pets 为 MIT 协议，第三方素材许可见
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

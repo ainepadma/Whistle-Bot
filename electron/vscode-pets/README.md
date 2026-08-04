@@ -46,6 +46,9 @@ npm run build:pets-bundle
 产物：`vscode-pets/media/main-bundle.js`（全局 `petApp`，原样调用
 `petApp.petPanelApp()`）。
 
+> `third_party/` 仅为本地参考目录，未随仓库提交；需要重新构建引擎时先
+> `git clone https://github.com/tonybaloney/vscode-pets.git ../third_party/vscode-pets`。
+
 ## 移植结构
 
 ```
