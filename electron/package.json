@@ -32,6 +32,11 @@
         "asarUnpack": [
             "vscode-pets/hooks/**/*"
         ],
+        "electronLanguages": [
+            "en-US",
+            "zh-CN"
+        ],
+        "compression": "maximum",
         "win": {
             "target": [
                 {
