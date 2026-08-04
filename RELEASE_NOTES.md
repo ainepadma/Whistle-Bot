@@ -27,14 +27,12 @@ Windows 桌面宠物应用 Beta 版。
 
 - 便携版 / Portable：`Banyao-Desktop-Pets-0.2.0-beta-portable.exe`
 - 安装版 / Installer：`Banyao-Desktop-Pets-0.2.0-beta-setup.exe`
-- 源码 / Source：`Banyao-Desktop-Pets-0.2.0-beta-source.zip`
 
 ## 说明 / Notes
 
-- 源码与安装包分开发布：源码以 Git 仓库（tag `v0.2.0-beta`）与源码 zip 提供，
+- 源码与安装包分开发布：源码以 Git 仓库（tag `v0.2.0-beta`）提供，
   安装包以 Release 附件提供 / Source and installers are published separately:
-  source via the Git repository (tag `v0.2.0-beta`) and source zip, installers as
-  release assets
+  source via the Git repository (tag `v0.2.0-beta`), installers as release assets
 - 安装包未签名，Windows SmartScreen 可能提示“未知发布者”/
   The installer is unsigned; Windows SmartScreen may show a warning
 - MIT License
