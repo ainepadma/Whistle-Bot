@@ -1,8 +1,8 @@
 'use strict';
 /**
- * VSCode Pets 桌面版 —— Electron 主进程
+ * 江海小鹞（Banyao Desktop Pets）—— Electron 主进程
  *
- * 将 tonybaloney/vscode-pets 的宠物引擎移植为 Windows 桌面宠物（本应用唯一入口）：
+ * Windows 桌面宠物（本应用唯一入口）：
  *  - 全屏透明、无边框、置顶覆盖层
  *  - 默认鼠标点击穿透，悬停到宠物上时才可交互
  *  - 系统托盘菜单 + 宠物右键菜单
@@ -19,18 +19,41 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 let petWindow = null;
 let tray = null;
 let ipcRegistered = false;
+let typingHelper = null;
+let typingReportTimer = null;
+let lastTypingSpeed = 0;
+let typingEnabled = false;
+
+function typingLog(message) {
+    try {
+        const logPath = path.join(app.getPath('userData'), 'typing-status.log');
+        fs.appendFileSync(
+            logPath,
+            `[${new Date().toISOString()}] ${message}\n`,
+            'utf8',
+        );
+    } catch (_) {
+        /* 忽略日志写入错误 */
+    }
+}
 
 // ------------------------------------------------------------------
 // 宠物清单（仅包含仓库中带有 GIF 素材的宠物）
 // ------------------------------------------------------------------
 const PET_TYPES = [
+    { type: 'qilian-star-kite', color: 'red', label: '🪁 七连星板鹞风筝' },
+]; /*
     { type: 'chicken', color: 'white', label: '🐔 小鸡 Chicken' },
     { type: 'clippy', color: 'black', label: '📎 Clippy' },
     { type: 'cockatiel', color: 'gray', label: '🐦 玄凤 Cockatiel' },
+    { type: 'liujiao-kite', color: 'red', label: '🪁 六角板鹞' },
+    { type: 'jiulian-star-kite', color: 'red', label: '✦ 九连星板鹞' },
+    { type: 'qilian-star-kite', color: 'red', label: '✦ 七连星板鹞' },
     { type: 'crab', color: 'red', label: '🦀 螃蟹 Crab' },
     { type: 'deno', color: 'green', label: '🦕 Deno' },
     { type: 'dog', color: 'black', label: '🐕 小狗 Dog' },
@@ -50,7 +73,7 @@ const PET_TYPES = [
     { type: 'totoro', color: 'gray', label: '🐭 龙猫 Totoro' },
     { type: 'turtle', color: 'green', label: '🐢 乌龟 Turtle' },
     { type: 'zappy', color: 'yellow', label: '🚀 Zappy' },
-];
+*/
 
 const THEMES = [
     { value: 'none', label: '无主题（透明桌面）' },
@@ -66,6 +89,13 @@ const SIZES = [
     { value: 'small', label: '小 Small' },
     { value: 'medium', label: '中 Medium' },
     { value: 'large', label: '大 Large' },
+];
+
+const DISPLAY_MODES = [
+    { value: 'full', label: '全屏' },
+    { value: 'left-quarter', label: '左侧四分之一' },
+    { value: 'right-quarter', label: '右侧四分之一' },
+    { value: 'small', label: '小窗口（可拖动控制条移动）' },
 ];
 
 // ------------------------------------------------------------------
@@ -95,6 +125,123 @@ function saveConfig(cfg) {
 // ------------------------------------------------------------------
 // 窗口
 // ------------------------------------------------------------------
+function typingHookScriptPath() {
+    if (__dirname.includes('app.asar')) {
+        return path.join(
+            process.resourcesPath,
+            'app.asar.unpacked',
+            'vscode-pets',
+            'hooks',
+            'typing-hook.ps1',
+        );
+    }
+    return path.join(__dirname, 'hooks', 'typing-hook.ps1');
+}
+
+function startTypingMonitor() {
+    try {
+        const script = typingHookScriptPath();
+        typingLog('typing monitor starting, script=' + script);
+        typingHelper = spawn(
+            'powershell.exe',
+            [
+                '-NoProfile',
+                '-ExecutionPolicy',
+                'Bypass',
+                '-WindowStyle',
+                'Hidden',
+                '-File',
+                script,
+            ],
+            { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+        );
+        typingHelper.stdout.setEncoding('utf8');
+        let buffer = '';
+        let lastSpeedLogTime = 0;
+        typingHelper.stdout.on('data', (chunk) => {
+            buffer += chunk;
+            let newline;
+            while ((newline = buffer.indexOf('\n')) >= 0) {
+                const line = buffer.slice(0, newline).trim();
+                buffer = buffer.slice(newline + 1);
+                if (!line) continue;
+                try {
+                    const parsed = JSON.parse(line);
+                    if (typeof parsed.speed === 'number') {
+                        lastTypingSpeed = parsed.speed;
+                        const nowMs = Date.now();
+                        if (parsed.speed > 0 || nowMs - lastSpeedLogTime >= 2000) {
+                            typingLog('detected speed=' + parsed.speed);
+                            lastSpeedLogTime = nowMs;
+                        }
+                    }
+                } catch (_) {
+                    /* 忽略无法解析的行 */
+                }
+            }
+        });
+        typingHelper.on('error', () => {
+            typingEnabled = false;
+            typingLog('typing helper error');
+        });
+        typingHelper.on('exit', () => {
+            typingEnabled = false;
+            typingLog('typing helper exited');
+        });
+
+        // 每 100ms 向渲染进程报告一次打字速度
+        typingReportTimer = setInterval(() => {
+            sendToRenderer({ command: 'typing-speed', speed: lastTypingSpeed });
+        }, 100);
+    } catch (_) {
+        typingEnabled = false;
+    }
+}
+
+function stopTypingMonitor() {
+    if (typingReportTimer) {
+        clearInterval(typingReportTimer);
+        typingReportTimer = null;
+    }
+    if (typingHelper) {
+        try {
+            typingHelper.kill();
+        } catch (_) {
+            /* 忽略 */
+        }
+        typingHelper = null;
+    }
+}
+
+function computeWindowBounds(mode) {
+    const display = screen.getPrimaryDisplay();
+    // 使用工作区（workArea）：默认位于 Windows 任务栏上方
+    const b = display.workArea;
+    switch (mode) {
+        case 'left-quarter': {
+            const width = Math.round(b.width / 4);
+            return { x: b.x, y: b.y, width, height: b.height };
+        }
+        case 'right-quarter': {
+            const width = Math.round(b.width / 4);
+            return { x: b.x + b.width - width, y: b.y, width, height: b.height };
+        }
+        case 'small': {
+            const width = 360;
+            const height = 280;
+            return {
+                x: b.x + b.width - width - 24,
+                y: b.y + b.height - height - 24,
+                width,
+                height,
+            };
+        }
+        case 'full':
+        default:
+            return { x: b.x, y: b.y, width: b.width, height: b.height };
+    }
+}
+
 function createVscodePetsWindow(options = {}) {
     if (petWindow && !petWindow.isDestroyed()) {
         petWindow.show();
@@ -102,16 +249,17 @@ function createVscodePetsWindow(options = {}) {
     }
 
     const config = loadConfig();
-    const display = screen.getPrimaryDisplay();
-    const { x, y, width, height } = display.bounds;
+    const modeArg = process.argv.find((a) => a.startsWith('--mode='));
+    const displayMode = modeArg ? modeArg.split('=')[1] : config.displayMode || 'full';
+    const bounds = computeWindowBounds(displayMode);
     const screenshotArg = process.argv.find((a) => a.startsWith('--screenshot'));
     const screenshotMode = !!screenshotArg;
 
     petWindow = new BrowserWindow({
-        x,
-        y,
-        width,
-        height,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
         frame: false,
         transparent: !screenshotMode,
         alwaysOnTop: true,
@@ -133,13 +281,15 @@ function createVscodePetsWindow(options = {}) {
 
     petWindow.setAlwaysOnTop(true, 'screen-saver');
     petWindow.setIgnoreMouseEvents(true, { forward: true });
+    petWindow.setMovable(displayMode === 'small');
 
     petWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), {
         query: {
             theme: config.theme || 'none',
             size: config.size || 'medium',
-            type: config.type || 'clippy',
-            color: config.color || 'black',
+            type: config.type || 'qilian-star-kite',
+            color: config.color || 'red',
+            mode: displayMode,
         },
     });
 
@@ -167,7 +317,7 @@ function createVscodePetsWindow(options = {}) {
         setTimeout(() => {
             if (petWindow && !petWindow.isDestroyed()) {
                 // 多放几只宠物，便于检查渲染效果
-                ['rocky', 'rubber-duck', 'totoro'].forEach((type, i) => {
+                ['qilian-star-kite'].forEach((type) => {
                     petWindow.webContents.send('pet:command', {
                         command: 'spawn-pet',
                         type,
@@ -181,7 +331,7 @@ function createVscodePetsWindow(options = {}) {
             if (petWindow && !petWindow.isDestroyed()) {
                 const image = await petWindow.webContents.capturePage();
                 fs.writeFileSync(path.resolve(out), image.toPNG());
-                console.log('[vscode-pets] screenshot saved:', path.resolve(out));
+                console.log('[banyao-desktop-pets] screenshot saved:', path.resolve(out));
             }
             setTimeout(() => app.quit(), 500);
         }, 4000);
@@ -223,12 +373,15 @@ function applyConfig(patch) {
     const config = Object.assign(loadConfig(), patch);
     saveConfig(config);
     if (petWindow && !petWindow.isDestroyed()) {
+        petWindow.setBounds(computeWindowBounds(config.displayMode || 'full'));
+        petWindow.setMovable((config.displayMode || 'full') === 'small');
         petWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), {
             query: {
                 theme: config.theme || 'none',
                 size: config.size || 'medium',
-                type: config.type || 'clippy',
-                color: config.color || 'black',
+                type: config.type || 'qilian-star-kite',
+                color: config.color || 'red',
+                mode: config.displayMode || 'full',
             },
         });
     }
@@ -246,10 +399,6 @@ function buildMenuTemplate() {
         },
         { type: 'separator' },
         {
-            label: '扔球（宠物会去追）',
-            click: () => sendToRenderer({ command: 'throw-ball' }),
-        },
-        {
             label: '添加宠物',
             submenu: PET_TYPES.map((p) => ({
                 label: p.label,
@@ -259,6 +408,15 @@ function buildMenuTemplate() {
                         type: p.type,
                         color: p.color,
                     }),
+            })),
+        },
+        {
+            label: '显示区域',
+            submenu: DISPLAY_MODES.map((m) => ({
+                label: m.label,
+                type: 'radio',
+                checked: (config.displayMode || 'full') === m.value,
+                click: () => applyConfig({ displayMode: m.value }),
             })),
         },
         {
@@ -300,7 +458,7 @@ function createTray() {
         icon = nativeImage.createEmpty();
     }
     tray = new Tray(icon);
-    tray.setToolTip('VSCode Pets 桌面版');
+    tray.setToolTip('江海小鹞 · Banyao Desktop Pets');
     tray.setContextMenu(Menu.buildFromTemplate(buildMenuTemplate()));
     tray.on('click', togglePetWindow);
 }
@@ -341,28 +499,48 @@ function registerIpc() {
 // ------------------------------------------------------------------
 // 应用入口
 // ------------------------------------------------------------------
-app.whenReady().then(() => {
-    registerIpc();
-    createVscodePetsWindow({ withTray: true });
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+    // 已有实例在运行，退出本实例
+    app.quit();
+} else {
+    // 用户再次启动时，把已有实例的宠物窗口显示出来
+    app.on('second-instance', () => {
+        if (petWindow && !petWindow.isDestroyed()) {
+            petWindow.show();
+        } else {
+            createVscodePetsWindow({ withTray: true });
+        }
+    });
 
-    // 全局快捷键：无论宠物是否隐藏，都能重新打开
-    const ok = globalShortcut.register('CommandOrControl+Alt+P', togglePetWindow);
-    if (!ok) {
-        console.warn('全局快捷键 Ctrl+Alt+P 注册失败');
-    }
-});
-
-// 桌宠应用常驻托盘，关闭窗口不退出
-app.on('window-all-closed', () => {
-    /* 保持后台运行 */
-});
-
-app.on('activate', () => {
-    if (!petWindow || petWindow.isDestroyed()) {
+    app.whenReady().then(() => {
+        registerIpc();
         createVscodePetsWindow({ withTray: true });
-    }
-});
+        startTypingMonitor();
 
-app.on('will-quit', () => {
-    globalShortcut.unregisterAll();
-});
+        // 全局快捷键：无论宠物是否隐藏，都能重新打开
+        const ok = globalShortcut.register(
+            'CommandOrControl+Alt+P',
+            togglePetWindow,
+        );
+        if (!ok) {
+            console.warn('全局快捷键 Ctrl+Alt+P 注册失败');
+        }
+    });
+
+    // 桌宠应用常驻托盘，关闭窗口不退出
+    app.on('window-all-closed', () => {
+        /* 保持后台运行 */
+    });
+
+    app.on('activate', () => {
+        if (!petWindow || petWindow.isDestroyed()) {
+            createVscodePetsWindow({ withTray: true });
+        }
+    });
+
+    app.on('will-quit', () => {
+        stopTypingMonitor();
+        globalShortcut.unregisterAll();
+    });
+}

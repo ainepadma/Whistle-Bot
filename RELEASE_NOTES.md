@@ -1,35 +1,40 @@
-# VSCode Pets 桌面版 v1.0.0 / VSCode Pets Desktop v1.0.0
+# 江海小鹞 · Banyao Desktop Pets Beta v0.2.0
 
-基于 [tonybaloney/vscode-pets](https://github.com/tonybaloney/vscode-pets)
-移植的 Windows 桌面宠物应用。
-
-A Windows desktop pet app ported from
-[tonybaloney/vscode-pets](https://github.com/tonybaloney/vscode-pets).
+Windows 桌面宠物应用 Beta 版。
 
 ## 功能亮点 / Highlights
 
-- 22 种宠物 / 22 pets：Clippy、Rocky、Zappy、Totoro、Rubber Duck、Chicken、Dog、
-  Fox、Horse、Panda、Skeleton、Raccoon、Rat、Turtle、Snail、Snake、Crab、Cockatiel、
-  Deno、Monkey、Morph、Mod
+- 内置南通板鹞风筝造型桌宠（七连星板鹞风筝）/
+  Built-in Nantong Banyao kite desktop pet (Seven-Star Kite)
 - 全屏透明置顶窗口，鼠标点击默认穿透 / Transparent always-on-top overlay with
   click-through by default
-- 点击或拖动宠物可扔出去，宠物会追逐小球 / Click or drag pets to throw them;
-  pets chase the ball
+- 显示区域可选：全屏 / 左四分之一 / 右四分之一 / 小窗口 /
+  Selectable display area: full screen / left quarter / right quarter / small window
+  （默认位于 Windows 任务栏上方 / above the Windows taskbar by default）
+- 打字联动：打字时随机宠物随输入速度上升，停止后缓慢下降 /
+  Typing-reactive pets: a random pet rises with typing speed and slowly descends
+  when you stop typing
+- 悬停或点击宠物会与它互动 / Hover or click pets to interact with them
 - 右上角控制条（菜单 / 隐藏 / 退出）/ Floating control bar (menu / hide / quit)
 - 系统托盘菜单 + 宠物右键菜单 / System tray menu + right-click pet menu
 - 全局快捷键 `Ctrl+Alt+P` 显示/隐藏宠物 / Global hotkey `Ctrl+Alt+P` to
   show/hide pets
+- 单实例运行，重复启动自动接管 / Single-instance lock with auto takeover
 - 主题背景与宠物大小可切换 / Switchable themes and pet sizes
 - 宠物状态自动保存，重启恢复 / Pet state persists across restarts
 
 ## 下载 / Downloads
 
-- 便携版 / Portable：`VSCode Pets 桌面版 1.0.0.exe`（免安装，双击运行）
-- 安装版 / Installer：`VSCode Pets 桌面版 Setup 1.0.0.exe`（NSIS 安装向导）
+- 便携版 / Portable：`Banyao-Desktop-Pets-0.2.0-beta-portable.exe`
+- 安装版 / Installer：`Banyao-Desktop-Pets-0.2.0-beta-setup.exe`
+- 源码 / Source：`Banyao-Desktop-Pets-0.2.0-beta-source.zip`
 
 ## 说明 / Notes
 
-- 不含猫咪素材：上游作者要求不随仓库分发 / Cats are excluded per the upstream
-  author's request
-- MIT License；上游项目 / Upstream project:
-  [tonybaloney/vscode-pets](https://github.com/tonybaloney/vscode-pets)
+- 源码与安装包分开发布：源码以 Git 仓库（tag `v0.2.0-beta`）与源码 zip 提供，
+  安装包以 Release 附件提供 / Source and installers are published separately:
+  source via the Git repository (tag `v0.2.0-beta`) and source zip, installers as
+  release assets
+- 安装包未签名，Windows SmartScreen 可能提示“未知发布者”/
+  The installer is unsigned; Windows SmartScreen may show a warning
+- MIT License

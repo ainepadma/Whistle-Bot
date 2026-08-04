@@ -1,7 +1,7 @@
 {
     "name": "banyao-desktop-pets",
-    "version": "1.0.0",
-    "description": "VSCode Pets 桌面版 —— tonybaloney/vscode-pets 的 Windows 桌面移植",
+    "version": "0.2.0",
+    "description": "江海小鹞（Banyao Desktop Pets）—— Windows 桌面宠物应用",
     "main": "vscode-pets/main.js",
     "scripts": {
         "start": "electron .",
@@ -20,14 +20,17 @@
         "esbuild": "^0.28.1"
     },
     "build": {
-        "appId": "com.banyao.vscode-pets-desktop",
-        "productName": "VSCode Pets 桌面版",
+        "appId": "com.banyao.desktop-pets",
+        "productName": "Banyao Desktop Pets",
         "directories": {
             "output": "dist"
         },
         "files": [
             "vscode-pets/**/*",
             "build/**/*"
+        ],
+        "asarUnpack": [
+            "vscode-pets/hooks/**/*"
         ],
         "win": {
             "target": [
@@ -44,7 +47,7 @@
                     ]
                 }
             ],
-            "icon": "build/icon.png"
+            "icon": "build/icon.ico"
         },
         "mac": {
             "target": "dmg",

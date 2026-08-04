@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VSCode Pets 桌面版</title>
+    <title>江海小鹞 · Banyao Desktop Pets</title>
     <link rel="stylesheet" href="../media/reset.css">
     <link rel="stylesheet" href="../media/pets.css">
     <style>
@@ -112,6 +112,38 @@
             background: rgba(239, 83, 80, 0.4);
             color: #ffffff;
         }
+
+        /* 小窗口模式下，控制条可作为窗口拖动把手 */
+        body.mode-small #petControlBar {
+            -webkit-app-region: drag;
+        }
+
+        #petControlBar button {
+            -webkit-app-region: no-drag;
+        }
+
+        /* 打字速度指示器（悬停/点击宠物时可见的调试与反馈） */
+        #typingIndicator {
+            position: fixed;
+            left: 14px;
+            top: 14px;
+            z-index: 2000;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(15, 18, 26, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: #d7dee8;
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            font-size: 12px;
+            line-height: 1;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #typingIndicator.hide {
+            opacity: 0;
+        }
     </style>
 </head>
 
@@ -126,8 +158,9 @@
     <div id="background"></div>
 
     <div id="desktopHint">
-        <b>VSCode Pets 桌面版</b><br>
-        拖动/点击宠物可以扔出去；<b>右上角控制条</b>可隐藏或退出，<b>Ctrl+Alt+P</b> 可重新打开宠物。
+        <b>江海小鹞</b><br>
+        悬停/点击宠物会与它互动；<b>右上角控制条</b>可隐藏或退出，<b>Ctrl+Alt+P</b> 可重新打开宠物。<br>
+        小窗口模式下可拖动控制条移动窗口位置。
     </div>
 
     <div id="petControlBar" title="宠物控制条">
@@ -135,6 +168,8 @@
         <button id="btnPetHide" title="隐藏宠物（托盘图标或 Ctrl+Alt+P 重新打开）">🙈</button>
         <button id="btnPetQuit" class="quit" title="退出应用">✖️</button>
     </div>
+
+    <div id="typingIndicator" class="hide">⌨️ <span id="typingSpeedText">0.0</span></div>
 
     <script src="../media/main-bundle.js"></script>
     <script src="glue.js"></script>

@@ -1,8 +1,8 @@
 'use strict';
 /**
- * VSCode Pets 桌面版 —— 预加载脚本
+ * 江海小鹞（Banyao Desktop Pets）—— 预加载脚本
  *
- * 为原版 vscode-pets 面板代码提供两个桥接：
+ * 为宠物引擎提供两个桥接：
  * 1. acquireVsCodeApi() 兼容层（状态存 localStorage，消息走 DOM 事件）
  * 2. petDesktop API（点击穿透、右键菜单、主进程命令）
  */
