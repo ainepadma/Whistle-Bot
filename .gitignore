@@ -25,6 +25,7 @@ third_party/
 # 本地验证截图
 screenshot*.png
 pet-shot.png
+basic-shot.png
 
 # 本地 GPT API 路由工具（非应用源码，不入库）
 gpt-api/
