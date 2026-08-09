@@ -377,7 +377,7 @@ function buildMenuTemplate() {
         },
         { type: 'separator' },
         {
-            label: '切换宠物（同时只展示一只）',
+            label: '切换宠物',
             submenu: PET_TYPES.map((p) => ({
                 label: p.label,
                 click: () =>
@@ -414,11 +414,6 @@ function buildMenuTemplate() {
                 checked: (config.size || 'medium') === s.value,
                 click: () => applyConfig({ size: s.value }),
             })),
-        },
-        { type: 'separator' },
-        {
-            label: '移除所有宠物',
-            click: () => sendToRenderer({ command: 'reset-pet' }),
         },
         { type: 'separator' },
         { label: '退出', click: () => app.quit() },
