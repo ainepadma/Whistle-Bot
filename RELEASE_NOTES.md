@@ -4,8 +4,8 @@ Windows 桌面宠物应用 Beta 版。
 
 ## 功能亮点 / Highlights
 
-- 内置南通板鹞风筝造型桌宠（七连星板鹞风筝）/
-  Built-in Nantong Banyao kite desktop pet (Seven-Star Kite)
+- 内置桌宠：七连星板鹞风筝、彩绘蝴蝶风筝（原生分辨率素材）/
+  Built-in pets: Seven-Star Kite and painted Butterfly Kite (native-resolution assets)
 - 全屏透明置顶窗口，鼠标点击默认穿透 / Transparent always-on-top overlay with
   click-through by default
 - 显示区域可选：全屏 / 左四分之一 / 右四分之一 / 小窗口 /

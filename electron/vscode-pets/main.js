@@ -47,6 +47,7 @@ function typingLog(message) {
 // ------------------------------------------------------------------
 const PET_TYPES = [
     { type: 'qilian-star-kite', color: 'red', label: '🪁 七连星板鹞风筝' },
+    { type: 'hudie-kite', color: 'red', label: '🦋 蝴蝶风筝' },
 ]; /*
     { type: 'chicken', color: 'white', label: '🐔 小鸡 Chicken' },
     { type: 'clippy', color: 'black', label: '📎 Clippy' },
@@ -251,6 +252,10 @@ function createVscodePetsWindow(options = {}) {
     const config = loadConfig();
     const modeArg = process.argv.find((a) => a.startsWith('--mode='));
     const displayMode = modeArg ? modeArg.split('=')[1] : config.displayMode || 'full';
+    const typeArg = process.argv.find((a) => a.startsWith('--pet-type='));
+    const colorArg = process.argv.find((a) => a.startsWith('--pet-color='));
+    const petType = typeArg ? typeArg.split('=')[1] : config.type || 'qilian-star-kite';
+    const petColor = colorArg ? colorArg.split('=')[1] : config.color || 'red';
     const bounds = computeWindowBounds(displayMode);
     const screenshotArg = process.argv.find((a) => a.startsWith('--screenshot'));
     const screenshotMode = !!screenshotArg;
@@ -287,8 +292,8 @@ function createVscodePetsWindow(options = {}) {
         query: {
             theme: config.theme || 'none',
             size: config.size || 'medium',
-            type: config.type || 'qilian-star-kite',
-            color: config.color || 'red',
+            type: petType,
+            color: petColor,
             mode: displayMode,
         },
     });
@@ -316,8 +321,8 @@ function createVscodePetsWindow(options = {}) {
 
         setTimeout(() => {
             if (petWindow && !petWindow.isDestroyed()) {
-                // 多放几只宠物，便于检查渲染效果
-                ['qilian-star-kite'].forEach((type) => {
+                // 多放一只宠物，便于检查渲染效果
+                [petType].forEach((type) => {
                     petWindow.webContents.send('pet:command', {
                         command: 'spawn-pet',
                         type,

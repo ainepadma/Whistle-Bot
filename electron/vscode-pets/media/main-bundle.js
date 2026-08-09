@@ -1367,6 +1367,46 @@ var petApp = (() => {
     "\u6653\u661F"
   ];
 
+  // ../third_party/vscode-pets/src/panel/pets/hudiekite.ts
+  var HudieKite = class extends BasePetType {
+    label = "hudie-kite";
+    static possibleColors = ["red" /* red */];
+    sequence = {
+      startingState: "sit-idle" /* sitIdle */,
+      sequenceStates: [
+        { state: "sit-idle" /* sitIdle */, possibleNextStates: ["walk-right" /* walkRight */, "run-right" /* runRight */] },
+        { state: "walk-right" /* walkRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
+        { state: "run-right" /* runRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
+        { state: "walk-left" /* walkLeft */, possibleNextStates: ["sit-idle" /* sitIdle */] },
+        { state: "run-left" /* runLeft */, possibleNextStates: ["sit-idle" /* sitIdle */] },
+        { state: "chase" /* chase */, possibleNextStates: ["idle-with-ball" /* idleWithBall */] },
+        { state: "idle-with-ball" /* idleWithBall */, possibleNextStates: ["walk-right" /* walkRight */, "walk-left" /* walkLeft */, "run-left" /* runLeft */, "run-right" /* runRight */] }
+      ]
+    };
+    get emoji() {
+      return "\u{1F98B}";
+    }
+    get hello() {
+      return " \u5F69\u8776\u98CE\u7B5D\uFF0C\u5FA1\u98CE\u800C\u884C\u3002";
+    }
+    get canSwipe() {
+      return false;
+    }
+    get canChase() {
+      return false;
+    }
+  };
+  var HUDIE_KITE_NAMES = [
+    "\u5F69\u8776",
+    "\u82B1\u8776",
+    "\u4E91\u7FC5",
+    "\u73E0\u775B",
+    "\u51E4\u7FFC",
+    "\u9713\u88F3",
+    "\u9526\u7FC5",
+    "\u91D1\u94C3"
+  ];
+
   // ../third_party/vscode-pets/src/panel/pets/crab.ts
   var Crab = class extends BasePetType {
     label = "crab";
@@ -3897,6 +3937,7 @@ var petApp = (() => {
       ["liujiao-kite" /* liujiaoKite */]: LIUJIAO_KITE_NAMES,
       ["jiulian-star-kite" /* jiulianStarKite */]: JIULIAN_STAR_KITE_NAMES,
       ["qilian-star-kite" /* qilianStarKite */]: QILIAN_STAR_KITE_NAMES,
+      ["hudie-kite" /* hudieKite */]: HUDIE_KITE_NAMES,
       ["raccoon" /* raccoon */]: RACCOON_NAMES,
       ["rat" /* rat */]: RAT_NAMES,
       ["turtle" /* turtle */]: TURTLE_NAMES,
@@ -4057,6 +4098,8 @@ var petApp = (() => {
         return new JiulianStarKite(...standardPetArguments, 4 /* fast */);
       case "qilian-star-kite" /* qilianStarKite */:
         return new QilianStarKite(...standardPetArguments, 4 /* fast */);
+      case "hudie-kite" /* hudieKite */:
+        return new HudieKite(...standardPetArguments, 4 /* fast */);
       case "monkey" /* monkey */:
         return new Monkey(...standardPetArguments, 3 /* normal */);
       case "rat" /* rat */:
@@ -4125,6 +4168,8 @@ var petApp = (() => {
         return JiulianStarKite.possibleColors;
       case "qilian-star-kite" /* qilianStarKite */:
         return QilianStarKite.possibleColors;
+      case "hudie-kite" /* hudieKite */:
+        return HudieKite.possibleColors;
       case "rat" /* rat */:
         return Rat.possibleColors;
       case "turtle" /* turtle */:
