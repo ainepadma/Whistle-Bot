@@ -1,6 +1,6 @@
 {
     "name": "banyao-desktop-pets",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "江海小鹞（Banyao Desktop Pets）—— Windows 桌面宠物应用",
     "main": "vscode-pets/main.js",
     "scripts": {

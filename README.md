@@ -5,6 +5,8 @@ Windows 桌面宠物应用。
 本项目基于 [tonybaloney/vscode-pets](https://github.com/tonybaloney/vscode-pets)
 开源项目（MIT 协议）移植。
 
+当前版本：**Beta v0.3.0**
+
 应用启动后直接放出桌宠，没有多余的页面。
 
 ## 功能
