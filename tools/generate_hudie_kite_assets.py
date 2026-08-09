@@ -12,6 +12,7 @@ Workflow:
 from __future__ import annotations
 
 import argparse
+import math
 from collections import deque
 from pathlib import Path
 
@@ -19,76 +20,64 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from PIL import ImageFont
 
 
-# 两只大眼睛的包围盒（占整图百分比，由视觉 API 测量）
+# 眼睛像素坐标（1112x1035 原图上由视觉 API 测量）：
+# box=(x0,y0,x1,y1), pupil=(cx,cy,r)
 EYE_SPECS = [
-    (37.6, 14.8, 8.6, 9.5),
-    (53.4, 14.8, 8.8, 9.5),
+    {'box': (418, 153, 513, 251), 'pupil': (470, 205, 19)},
+    {'box': (595, 153, 697, 251), 'pupil': (640, 202, 19)},
 ]
 
 
 def close_eyes(image: Image.Image) -> Image.Image:
-    """把风筝的大眼睛彻底改画成放松闭合的眼皮（左右略不对称），并加睡眠符号。"""
+    """只清除瞳孔/眼白/高光，保留彩色环纹，再画细闭眼弧线与睡眠符号。"""
     img = image.copy()
     width, height = img.size
     pixels = img.load()
     draw = ImageDraw.Draw(img)
 
-    for (ex, ey, ew, eh) in EYE_SPECS:
-        x0 = int(ex / 100.0 * width)
-        y0 = int(ey / 100.0 * height)
-        x1 = int((ex + ew) / 100.0 * width)
-        y1 = int((ey + eh) / 100.0 * height)
-        margin = max(2, int((x1 - x0) * 0.06))
+    for index, spec in enumerate(EYE_SPECS):
+        x0, y0, x1, y1 = spec['box']
+        cx, cy, radius = spec['pupil']
+        eye_w = x1 - x0
+        eye_h = y1 - y0
 
-        def sample_avg(xs, ys):
-            collected = []
-            for xx in xs:
-                for yy in ys:
-                    if 0 <= xx < width and 0 <= yy < height:
-                        r, g, b, a = pixels[xx, yy]
-                        if a > 0:
-                            collected.append((r, g, b))
-            if not collected:
-                return (248, 55, 20)
-            return tuple(sum(c[i] for c in collected) // len(collected) for i in range(3))
+        # 用瞳孔外圈（半径+14，更外侧的亮环纹）克隆填充瞳孔，保留像素质感
+        sample_radius = radius + 14
+        fill_radius = radius + 5
+        for yy in range(cy - fill_radius - 2, cy + fill_radius + 3):
+            for xx in range(cx - fill_radius - 2, cx + fill_radius + 3):
+                if 0 <= xx < width and 0 <= yy < height:
+                    dx = xx - cx
+                    dy = yy - cy
+                    if dx * dx + dy * dy <= (fill_radius + 1) * (fill_radius + 1):
+                        angle = math.atan2(dy, dx) if (dx or dy) else 0.0
+                        sx = int(cx + math.cos(angle) * sample_radius)
+                        sy = int(cy + math.sin(angle) * sample_radius)
+                        if 0 <= sx < width and 0 <= sy < height:
+                            r, g, b, a = pixels[sx, sy]
+                            pixels[xx, yy] = (r, g, b, a)
 
-        top_color = sample_avg(range(x0 - margin, x1 + margin), range(y0 - margin, y0))
-        bottom_color = sample_avg(range(x0 - margin, x1 + margin), range(y1, y1 + margin))
-
-        # 上下渐变填充，避免出现呆板的纯色圆块
-        gradient = Image.new('RGB', (1, 2))
-        gradient.putpixel((0, 0), top_color)
-        gradient.putpixel((0, 1), bottom_color)
-        gradient = gradient.resize((x1 - x0 + 1, y1 - y0 + 1), Image.Resampling.BILINEAR)
-        eye_mask = Image.new('L', (x1 - x0 + 1, y1 - y0 + 1), 0)
-        ImageDraw.Draw(eye_mask).ellipse((0, 0, x1 - x0, y1 - y0), fill=255)
-        img.paste(gradient, (x0, y0), eye_mask)
-
-        # 细眼皮弧线：左眼闭得更紧一点，右眼稍放松（不对称更自然）
-        lid_width = max(2, int((x1 - x0) * 0.05))
-        is_left = ex < 50
-        drop = 0.74 if is_left else 0.62
-        left = (x0 + int((x1 - x0) * 0.14), y0 + int((y1 - y0) * 0.42))
-        right = (x1 - int((x1 - x0) * 0.14), y0 + int((y1 - y0) * 0.42))
-        mid = ((left[0] + right[0]) // 2, y0 + int((y1 - y0) * drop))
-        draw.line([left, mid, right], fill=(8, 38, 28), width=lid_width, joint='curve')
-        # 眼皮下缘再叠一条稍浅的描边，增强“闭眼褶”的质感
-        draw.line(
-            [(left[0], left[1] + lid_width), (mid[0], mid[1] + lid_width), (right[0], right[1] + lid_width)],
-            fill=(60, 70, 60),
-            width=max(1, lid_width // 2),
-            joint='curve',
-        )
+        # 平滑贝塞尔闭眼弧线（横贯眼区，左右略不对称）
+        lid_width = max(2, int(eye_w * 0.04))
+        left = (x0 + int(eye_w * 0.10), cy - int(eye_h * 0.06))
+        right = (x1 - int(eye_w * 0.10), cy - int(eye_h * 0.06))
+        drop = int(eye_h * (0.14 if index == 0 else 0.10))
+        mid = ((left[0] + right[0]) // 2, cy + drop)
+        points = []
+        for step in range(15):
+            t = step / 14.0
+            px = (1 - t) ** 2 * left[0] + 2 * (1 - t) * t * mid[0] + t ** 2 * right[0]
+            py = (1 - t) ** 2 * left[1] + 2 * (1 - t) * t * mid[1] + t ** 2 * right[1]
+            points.append((px, py))
+        draw.line(points, fill=(8, 38, 28), width=lid_width, joint='curve')
 
     # 头顶侧边加两个由小到大的“z→Z”睡眠符号（斜向上飘）
     try:
         font_small = ImageFont.load_default(size=max(16, int(width * 0.028)))
         font_big = ImageFont.load_default(size=max(24, int(width * 0.045)))
-        right_eye = EYE_SPECS[1]
-        zx = int((right_eye[0] + right_eye[2]) / 100.0 * width) + int(width * 0.02)
-        zy = int(right_eye[1] / 100.0 * height) - int(height * 0.14)
-        draw.text((zx, zy), 'z', font=font_small, fill=(214, 171, 69), stroke_width=max(1, lid_width // 3), stroke_fill=(8, 38, 28))
-        draw.text((zx + int(width * 0.045), zy - int(height * 0.055)), 'Z', font=font_big, fill=(255, 247, 223), stroke_width=max(1, lid_width // 3), stroke_fill=(8, 38, 28))
+        # 睡眠符号移到右上角空白区，避免压到触角；只用金色+深色描边，避免白色残留
+        draw.text((int(width * 0.80), int(height * 0.05)), 'z', font=font_small, fill=(214, 171, 69), stroke_width=2, stroke_fill=(8, 38, 28))
+        draw.text((int(width * 0.85), int(height * 0.015)), 'Z', font=font_big, fill=(214, 171, 69), stroke_width=2, stroke_fill=(8, 38, 28))
     except Exception:
         pass
 
@@ -96,7 +85,7 @@ def close_eyes(image: Image.Image) -> Image.Image:
 
 
 def lying_pose(image: Image.Image, squash: float = 0.78, angle: float = -12.0, shear: float = 0.12, dy: int = 0) -> Image.Image:
-    """把风筝压扁、微倾并放到底部，形成瘫睡在底边的姿态。"""
+    """把风筝压扁、微倾，输出画布自适应内容尺寸，避免翅膀/飘带被裁切。"""
     rotated = image.rotate(angle, Image.Resampling.BICUBIC, expand=True)
     rw, rh = rotated.size
     # 横向剪切，让身体明显歪向一侧（瘫软感）
@@ -108,11 +97,11 @@ def lying_pose(image: Image.Image, squash: float = 0.78, angle: float = -12.0, s
     )
     nh = max(1, round(rh * squash))
     squashed = sheared.resize((rw, nh), Image.Resampling.LANCZOS)
-    canvas = Image.new('RGBA', image.size, (0, 0, 0, 0))
-    x = (image.size[0] - rw) // 2 - int(image.size[0] * 0.02)
-    y = image.size[1] - nh - 1 - dy
-    canvas.paste(squashed, (x, y), squashed)
-    return canvas
+    if dy:
+        canvas = Image.new('RGBA', (rw, nh + dy), (0, 0, 0, 0))
+        canvas.paste(squashed, (0, dy), squashed)
+        return canvas
+    return squashed
 
 
 def remove_dark_background(image: Image.Image, tolerance: int = 60) -> Image.Image:
