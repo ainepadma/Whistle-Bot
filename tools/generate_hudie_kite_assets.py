@@ -95,34 +95,23 @@ def close_eyes(image: Image.Image) -> Image.Image:
     return img
 
 
-def lying_pose(image: Image.Image, squash: float = 0.70, lean: float = 0.16, dy: int = 0) -> Image.Image:
-    """四角透视变形：上窄下宽、整体侧倾并压扁，瘫睡在画面底部。"""
-    width, height = image.size
-    top_w = max(1, int(width * (1 - lean)))
-    bot_w = max(1, int(width * (1 - lean * 0.55)))
-    bot_y = max(1, int(height * squash))
-    x_off = int(width * lean * 0.30)
-    dest = [
-        (x_off, 0),                                    # TL
-        (x_off + top_w, int(height * 0.05)),           # TR
-        (x_off + bot_w, bot_y),                        # BR
-        (x_off + (top_w - bot_w) // 2, bot_y),         # BL
-    ]
-    warped = image.transform(
-        (width, height),
-        Image.Transform.QUAD,
-        [coord for point in dest for coord in point],
+def lying_pose(image: Image.Image, squash: float = 0.78, angle: float = -12.0, shear: float = 0.12, dy: int = 0) -> Image.Image:
+    """把风筝压扁、微倾并放到底部，形成瘫睡在底边的姿态。"""
+    rotated = image.rotate(angle, Image.Resampling.BICUBIC, expand=True)
+    rw, rh = rotated.size
+    # 横向剪切，让身体明显歪向一侧（瘫软感）
+    sheared = rotated.transform(
+        (rw, rh),
+        Image.Transform.AFFINE,
+        (1, shear, 0, 0, 1, 0),
         Image.Resampling.BICUBIC,
     )
-    bbox = warped.getbbox()
-    if bbox:
-        warped = warped.crop(bbox)
-
-    canvas = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    w2, h2 = warped.size
-    x = (width - w2) // 2 - int(width * 0.03)
-    y = height - h2 - 1 - dy
-    canvas.paste(warped, (x, y), warped)
+    nh = max(1, round(rh * squash))
+    squashed = sheared.resize((rw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new('RGBA', image.size, (0, 0, 0, 0))
+    x = (image.size[0] - rw) // 2 - int(image.size[0] * 0.02)
+    y = image.size[1] - nh - 1 - dy
+    canvas.paste(squashed, (x, y), squashed)
     return canvas
 
 
@@ -281,8 +270,8 @@ def build(input_path: Path, output_dir: Path, tolerance: int):
 
     # 睡觉姿态：闭眼 + 瘫睡贴底 + 缓慢呼吸起伏
     eyes_closed = close_eyes(sprite)
-    lie_specs = [(0.68, 1), (0.72, 0), (0.70, 0), (0.71, 1), (0.69, 0), (0.72, 0)]
-    lie_frames = [lying_pose(eyes_closed, sq, 0.16, d) for sq, d in lie_specs]
+    lie_specs = [(0.76, 1), (0.80, 0), (0.78, 0), (0.79, 1), (0.77, 0), (0.80, 0)]
+    lie_frames = [lying_pose(eyes_closed, sq, -12.0, 0.12, d) for sq, d in lie_specs]
     save_gif(output_dir / 'red_lie_8fps.gif', lie_frames)
     lie_frames[0].save(output_dir / 'preview_sleep.png')
 
