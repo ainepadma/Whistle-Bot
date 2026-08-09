@@ -377,7 +377,7 @@ function buildMenuTemplate() {
         },
         { type: 'separator' },
         {
-            label: '添加宠物',
+            label: '切换宠物（同时只展示一只）',
             submenu: PET_TYPES.map((p) => ({
                 label: p.label,
                 click: () =>

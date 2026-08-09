@@ -27,10 +27,30 @@
             handleTypingSpeed(command.speed || 0);
             return;
         }
+        if (command && command.command === 'spawn-pet') {
+            // 切换宠物：同一时间只展示一只，先清空当前宠物
+            removeAllPets();
+        }
         window.dispatchEvent(
             new MessageEvent('message', { data: command }),
         );
     });
+
+    // ── 单宠物约束 ──
+    function removeAllPets() {
+        while ((window.petApp?.allPets?.pets || []).length > 0) {
+            window.petApp.allPets.remove(window.petApp.allPets.pets[0]);
+        }
+    }
+
+    function ensureSinglePet() {
+        while ((window.petApp?.allPets?.pets || []).length > 1) {
+            window.petApp.allPets.remove(window.petApp.allPets.pets[0]);
+        }
+        if (window.petApp?.saveState) {
+            window.petApp.saveState();
+        }
+    }
 
     // ── 打字联动：随机一只宠物随输入速度上升，停止输入后缓慢下降 ──
     const typingState = {
@@ -161,5 +181,7 @@
     // 启动宠物引擎（主题 kind=2 即暗色；禁用鼠标抛掷/扔球）
     if (petType && petColor) {
         petApp.petPanelApp('../media', theme, 2, petColor, size, petType, false, false);
+        // 若恢复出多只宠物，只保留一只
+        ensureSinglePet();
     }
 })();
