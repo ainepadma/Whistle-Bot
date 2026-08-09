@@ -142,7 +142,6 @@
                 el.closest &&
                 (el.closest('.collision') ||
                     el.closest('.bubble') ||
-                    el.closest('#petControlBar') ||
                     el.closest('#desktopHint'))
             );
             if (interactive !== lastInteractive) {
@@ -159,17 +158,6 @@
             event.preventDefault();
             window.petDesktop.openMenu();
         }
-    });
-
-    // 控制条按钮
-    document.getElementById('btnPetMenu')?.addEventListener('click', () => {
-        window.petDesktop.openMenu();
-    });
-    document.getElementById('btnPetHide')?.addEventListener('click', () => {
-        window.petDesktop.hideWindow();
-    });
-    document.getElementById('btnPetQuit')?.addEventListener('click', () => {
-        window.petDesktop.quitApp();
     });
 
     // 提示气泡 8 秒后淡出

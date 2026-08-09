@@ -15,7 +15,6 @@ Windows 桌面宠物应用 Beta 版。
   Typing-reactive pets: a random pet rises with typing speed and slowly descends
   when you stop typing
 - 悬停或点击宠物会与它互动 / Hover or click pets to interact with them
-- 右上角控制条（菜单 / 隐藏 / 退出）/ Floating control bar (menu / hide / quit)
 - 系统托盘菜单 + 宠物右键菜单：切换宠物 /
   System tray menu + right-click pet menu: switch pets
 - 全局快捷键 `Ctrl+Alt+P` 显示/隐藏宠物 / Global hotkey `Ctrl+Alt+P` to

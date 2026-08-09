@@ -65,63 +65,6 @@
             pointer-events: none;
         }
 
-        /* 右上角控制条：菜单 / 隐藏 / 退出 */
-        #petControlBar {
-            position: fixed;
-            top: 14px;
-            right: 14px;
-            z-index: 2000;
-            display: flex;
-            gap: 6px;
-            padding: 6px;
-            border-radius: 12px;
-            background: rgba(15, 18, 26, 0.72);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-            pointer-events: auto;
-            opacity: 0.78;
-            transition: opacity 0.2s ease;
-            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
-        }
-
-        #petControlBar:hover {
-            opacity: 1;
-        }
-
-        #petControlBar button {
-            width: 34px;
-            height: 34px;
-            border: none;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.08);
-            color: #d7dee8;
-            font-size: 16px;
-            line-height: 1;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-        }
-
-        #petControlBar button:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        #petControlBar button.quit:hover {
-            background: rgba(239, 83, 80, 0.4);
-            color: #ffffff;
-        }
-
-        /* 小窗口模式下，控制条可作为窗口拖动把手 */
-        body.mode-small #petControlBar {
-            -webkit-app-region: drag;
-        }
-
-        #petControlBar button {
-            -webkit-app-region: no-drag;
-        }
-
         /* 打字速度指示器（悬停/点击宠物时可见的调试与反馈） */
         #typingIndicator {
             position: fixed;
@@ -159,14 +102,7 @@
 
     <div id="desktopHint">
         <b>江海小鹞</b><br>
-        悬停/点击宠物会与它互动；<b>右上角控制条</b>可隐藏或退出，<b>Ctrl+Alt+P</b> 可重新打开宠物。<br>
-        小窗口模式下可拖动控制条移动窗口位置。
-    </div>
-
-    <div id="petControlBar" title="宠物控制条">
-        <button id="btnPetMenu" title="菜单：切换宠物 / 主题 / 大小">⚙️</button>
-        <button id="btnPetHide" title="隐藏宠物（托盘图标或 Ctrl+Alt+P 重新打开）">🙈</button>
-        <button id="btnPetQuit" class="quit" title="退出应用">✖️</button>
+        悬停/点击宠物会与它互动；<b>托盘图标</b>可隐藏或退出，<b>Ctrl+Alt+P</b> 可重新打开宠物。
     </div>
 
     <div id="typingIndicator" class="hide">⌨️ <span id="typingSpeedText">0.0</span></div>
