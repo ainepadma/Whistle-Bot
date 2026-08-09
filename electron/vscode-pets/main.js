@@ -46,35 +46,8 @@ function typingLog(message) {
 // 宠物清单（仅包含仓库中带有 GIF 素材的宠物）
 // ------------------------------------------------------------------
 const PET_TYPES = [
-    { type: 'qilian-star-kite', color: 'red', label: '🪁 七连星板鹞风筝' },
     { type: 'hudie-kite', color: 'red', label: '🦋 蝴蝶风筝' },
-]; /*
-    { type: 'chicken', color: 'white', label: '🐔 小鸡 Chicken' },
-    { type: 'clippy', color: 'black', label: '📎 Clippy' },
-    { type: 'cockatiel', color: 'gray', label: '🐦 玄凤 Cockatiel' },
-    { type: 'liujiao-kite', color: 'red', label: '🪁 六角板鹞' },
-    { type: 'jiulian-star-kite', color: 'red', label: '✦ 九连星板鹞' },
-    { type: 'qilian-star-kite', color: 'red', label: '✦ 七连星板鹞' },
-    { type: 'crab', color: 'red', label: '🦀 螃蟹 Crab' },
-    { type: 'deno', color: 'green', label: '🦕 Deno' },
-    { type: 'dog', color: 'black', label: '🐕 小狗 Dog' },
-    { type: 'fox', color: 'red', label: '🦊 狐狸 Fox' },
-    { type: 'horse', color: 'brown', label: '🐴 骏马 Horse' },
-    { type: 'mod', color: 'purple', label: '🤖 Mod' },
-    { type: 'monkey', color: 'gray', label: '🐵 猴子 Monkey' },
-    { type: 'morph', color: 'purple', label: '🫠 Morph' },
-    { type: 'panda', color: 'black', label: '🐼 熊猫 Panda' },
-    { type: 'raccoon', color: 'gray', label: '🦝 浣熊 Raccoon' },
-    { type: 'rat', color: 'gray', label: '🐀 老鼠 Rat' },
-    { type: 'rocky', color: 'gray', label: '🪨 Rocky' },
-    { type: 'rubber-duck', color: 'yellow', label: '🐤 橡皮鸭 Rubber Duck' },
-    { type: 'skeleton', color: 'brown', label: '💀 骷髅 Skeleton' },
-    { type: 'snail', color: 'brown', label: '🐌 蜗牛 Snail' },
-    { type: 'snake', color: 'green', label: '🐍 蛇 Snake' },
-    { type: 'totoro', color: 'gray', label: '🐭 龙猫 Totoro' },
-    { type: 'turtle', color: 'green', label: '🐢 乌龟 Turtle' },
-    { type: 'zappy', color: 'yellow', label: '🚀 Zappy' },
-*/
+];
 
 const THEMES = [
     { value: 'none', label: '无主题（透明桌面）' },
@@ -254,7 +227,7 @@ function createVscodePetsWindow(options = {}) {
     const displayMode = modeArg ? modeArg.split('=')[1] : config.displayMode || 'full';
     const typeArg = process.argv.find((a) => a.startsWith('--pet-type='));
     const colorArg = process.argv.find((a) => a.startsWith('--pet-color='));
-    const petType = typeArg ? typeArg.split('=')[1] : config.type || 'qilian-star-kite';
+    const petType = typeArg ? typeArg.split('=')[1] : config.type || 'hudie-kite';
     const petColor = colorArg ? colorArg.split('=')[1] : config.color || 'red';
     const bounds = computeWindowBounds(displayMode);
     const screenshotArg = process.argv.find((a) => a.startsWith('--screenshot'));
@@ -384,7 +357,7 @@ function applyConfig(patch) {
             query: {
                 theme: config.theme || 'none',
                 size: config.size || 'medium',
-                type: config.type || 'qilian-star-kite',
+                type: config.type || 'hudie-kite',
                 color: config.color || 'red',
                 mode: config.displayMode || 'full',
             },

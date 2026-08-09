@@ -1233,140 +1233,6 @@ var petApp = (() => {
     "Luna"
   ];
 
-  // ../third_party/vscode-pets/src/panel/pets/liujiaokite.ts
-  var LiujiaoKite = class extends BasePetType {
-    label = "liujiao-kite";
-    static possibleColors = ["red" /* red */];
-    sequence = {
-      startingState: "sit-idle" /* sitIdle */,
-      sequenceStates: [
-        {
-          state: "sit-idle" /* sitIdle */,
-          possibleNextStates: ["walk-right" /* walkRight */, "run-right" /* runRight */]
-        },
-        {
-          state: "walk-right" /* walkRight */,
-          possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */]
-        },
-        {
-          state: "run-right" /* runRight */,
-          possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */]
-        },
-        {
-          state: "walk-left" /* walkLeft */,
-          possibleNextStates: ["sit-idle" /* sitIdle */]
-        },
-        {
-          state: "run-left" /* runLeft */,
-          possibleNextStates: ["sit-idle" /* sitIdle */]
-        },
-        {
-          state: "chase" /* chase */,
-          possibleNextStates: ["idle-with-ball" /* idleWithBall */]
-        },
-        {
-          state: "idle-with-ball" /* idleWithBall */,
-          possibleNextStates: [
-            "walk-right" /* walkRight */,
-            "walk-left" /* walkLeft */,
-            "run-left" /* runLeft */,
-            "run-right" /* runRight */
-          ]
-        }
-      ]
-    };
-    get emoji() {
-      return "\u{1FA81}";
-    }
-    get hello() {
-      return " \u4E58\u98CE\u800C\u6765\uFF0C\u516D\u89D2\u677F\u9E5E\u632F\u7FC5\u98DE\u7FD4\u3002";
-    }
-  };
-  var LIUJIAO_KITE_NAMES = [
-    "\u9752\u4E91",
-    "\u8D64\u7FCE",
-    "\u9010\u98CE",
-    "\u4E91\u9E5E",
-    "\u9E23\u9704",
-    "\u98DE\u7EEB",
-    "\u6674\u5C9A",
-    "\u5DE1\u7A7A"
-  ];
-
-  // ../third_party/vscode-pets/src/panel/pets/jiulianstarkite.ts
-  var JiulianStarKite = class extends BasePetType {
-    label = "jiulian-star-kite";
-    static possibleColors = ["red" /* red */];
-    sequence = {
-      startingState: "sit-idle" /* sitIdle */,
-      sequenceStates: [
-        { state: "sit-idle" /* sitIdle */, possibleNextStates: ["walk-right" /* walkRight */, "run-right" /* runRight */] },
-        { state: "walk-right" /* walkRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
-        { state: "run-right" /* runRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
-        { state: "walk-left" /* walkLeft */, possibleNextStates: ["sit-idle" /* sitIdle */] },
-        { state: "run-left" /* runLeft */, possibleNextStates: ["sit-idle" /* sitIdle */] },
-        { state: "chase" /* chase */, possibleNextStates: ["idle-with-ball" /* idleWithBall */] },
-        { state: "idle-with-ball" /* idleWithBall */, possibleNextStates: ["walk-right" /* walkRight */, "walk-left" /* walkLeft */, "run-left" /* runLeft */, "run-right" /* runRight */] }
-      ]
-    };
-    get emoji() {
-      return "\u2726";
-    }
-    get hello() {
-      return " \u4E5D\u8FDE\u661F\u677F\u9E5E\uFF0C\u4E58\u98CE\u98DE\u7FD4\u3002";
-    }
-  };
-  var JIULIAN_STAR_KITE_NAMES = [
-    "\u4E5D\u661F",
-    "\u661F\u6CB3",
-    "\u8FDE\u74A7",
-    "\u66DC\u98CE",
-    "\u5929\u67A2",
-    "\u661F\u76D8",
-    "\u4E91\u7AE0",
-    "\u4E5D\u66DC"
-  ];
-
-  // ../third_party/vscode-pets/src/panel/pets/qilianstarkite.ts
-  var QilianStarKite = class extends BasePetType {
-    label = "qilian-star-kite";
-    static possibleColors = ["red" /* red */];
-    sequence = {
-      startingState: "sit-idle" /* sitIdle */,
-      sequenceStates: [
-        { state: "sit-idle" /* sitIdle */, possibleNextStates: ["walk-right" /* walkRight */, "run-right" /* runRight */] },
-        { state: "walk-right" /* walkRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
-        { state: "run-right" /* runRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
-        { state: "walk-left" /* walkLeft */, possibleNextStates: ["sit-idle" /* sitIdle */] },
-        { state: "run-left" /* runLeft */, possibleNextStates: ["sit-idle" /* sitIdle */] },
-        { state: "chase" /* chase */, possibleNextStates: ["idle-with-ball" /* idleWithBall */] },
-        { state: "idle-with-ball" /* idleWithBall */, possibleNextStates: ["walk-right" /* walkRight */, "walk-left" /* walkLeft */, "run-left" /* runLeft */, "run-right" /* runRight */] }
-      ]
-    };
-    get emoji() {
-      return "\u2726";
-    }
-    get hello() {
-      return " \u4E03\u8FDE\u661F\u677F\u9E5E\uFF0C\u968F\u98CE\u8F7B\u6446\u3002";
-    }
-    get canSwipe() {
-      return false;
-    }
-    get canChase() {
-      return false;
-    }
-  };
-  var QILIAN_STAR_KITE_NAMES = [
-    "\u4E03\u661F",
-    "\u82B1\u4FE1",
-    "\u8FDE\u534E",
-    "\u661F\u7C07",
-    "\u7EDB\u971E",
-    "\u4E91\u9526",
-    "\u745E\u534E",
-    "\u6653\u661F"
-  ];
-
   // ../third_party/vscode-pets/src/panel/pets/hudiekite.ts
   var HudieKite = class extends BasePetType {
     label = "hudie-kite";
@@ -3934,9 +3800,6 @@ var petApp = (() => {
       ["zappy" /* zappy */]: ZAPPY_NAMES,
       ["rocky" /* rocky */]: ROCKY_NAMES,
       ["cockatiel" /* cockatiel */]: COCKATIEL_NAMES,
-      ["liujiao-kite" /* liujiaoKite */]: LIUJIAO_KITE_NAMES,
-      ["jiulian-star-kite" /* jiulianStarKite */]: JIULIAN_STAR_KITE_NAMES,
-      ["qilian-star-kite" /* qilianStarKite */]: QILIAN_STAR_KITE_NAMES,
       ["hudie-kite" /* hudieKite */]: HUDIE_KITE_NAMES,
       ["raccoon" /* raccoon */]: RACCOON_NAMES,
       ["rat" /* rat */]: RAT_NAMES,
@@ -4092,12 +3955,6 @@ var petApp = (() => {
         return new Rocky(...standardPetArguments, 0 /* still */);
       case "cockatiel" /* cockatiel */:
         return new Cockatiel(...standardPetArguments, 3 /* normal */);
-      case "liujiao-kite" /* liujiaoKite */:
-        return new LiujiaoKite(...standardPetArguments, 4 /* fast */);
-      case "jiulian-star-kite" /* jiulianStarKite */:
-        return new JiulianStarKite(...standardPetArguments, 4 /* fast */);
-      case "qilian-star-kite" /* qilianStarKite */:
-        return new QilianStarKite(...standardPetArguments, 4 /* fast */);
       case "hudie-kite" /* hudieKite */:
         return new HudieKite(...standardPetArguments, 4 /* fast */);
       case "monkey" /* monkey */:
@@ -4162,12 +4019,6 @@ var petApp = (() => {
         return Rocky.possibleColors;
       case "cockatiel" /* cockatiel */:
         return Cockatiel.possibleColors;
-      case "liujiao-kite" /* liujiaoKite */:
-        return LiujiaoKite.possibleColors;
-      case "jiulian-star-kite" /* jiulianStarKite */:
-        return JiulianStarKite.possibleColors;
-      case "qilian-star-kite" /* qilianStarKite */:
-        return QilianStarKite.possibleColors;
       case "hudie-kite" /* hudieKite */:
         return HudieKite.possibleColors;
       case "rat" /* rat */:
