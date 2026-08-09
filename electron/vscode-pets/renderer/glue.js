@@ -10,6 +10,7 @@
     const petType = params.get('type');
     const petColor = params.get('color');
     const mode = params.get('mode') || 'full';
+    const sleepDelay = parseInt(params.get('sleep') || '60000', 10);
 
     // 小窗口模式启用控制条拖拽
     document.body.classList.add('mode-' + mode);
@@ -67,6 +68,15 @@
     function handleTypingSpeed(speed) {
         typingState.speed = speed;
         if (speed > 0.3) {
+            // 打字即醒，并重置“长时间不打字”计时
+            if (isAsleep) {
+                isAsleep = false;
+                window.dispatchEvent(
+                    new MessageEvent('message', { data: { command: 'pet-wake' } }),
+                );
+                console.log('[glue] pet woken up');
+            }
+            scheduleSleepCheck();
             typingState.lastTypingAt = performance.now();
             if (typingIndicator) {
                 typingIndicator.classList.remove('hide');
@@ -91,6 +101,26 @@
             typingState.target = Math.min(170, 24 + speed * 34);
         }
     }
+
+    // ── 睡觉检测：长时间不打字自动入睡 ──
+    let isAsleep = false;
+    let sleepTimer = null;
+
+    function scheduleSleepCheck() {
+        if (sleepTimer) {
+            clearTimeout(sleepTimer);
+        }
+        sleepTimer = setTimeout(() => {
+            if (!isAsleep) {
+                isAsleep = true;
+                window.dispatchEvent(
+                    new MessageEvent('message', { data: { command: 'pet-sleep' } }),
+                );
+                console.log('[glue] pet sleeping');
+            }
+        }, sleepDelay);
+    }
+    scheduleSleepCheck();
 
     function animateLift(now) {
         const st = typingState;

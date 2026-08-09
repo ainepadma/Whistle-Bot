@@ -227,8 +227,10 @@ function createVscodePetsWindow(options = {}) {
     const displayMode = modeArg ? modeArg.split('=')[1] : config.displayMode || 'full';
     const typeArg = process.argv.find((a) => a.startsWith('--pet-type='));
     const colorArg = process.argv.find((a) => a.startsWith('--pet-color='));
+    const sleepArg = process.argv.find((a) => a.startsWith('--sleep='));
     const petType = typeArg ? typeArg.split('=')[1] : config.type || 'hudie-kite';
     const petColor = colorArg ? colorArg.split('=')[1] : config.color || 'red';
+    const sleepMs = sleepArg ? sleepArg.split('=')[1] : '';
     const bounds = computeWindowBounds(displayMode);
     const screenshotArg = process.argv.find((a) => a.startsWith('--screenshot'));
     const screenshotMode = !!screenshotArg;
@@ -268,6 +270,7 @@ function createVscodePetsWindow(options = {}) {
             type: petType,
             color: petColor,
             mode: displayMode,
+            sleep: sleepMs,
         },
     });
 

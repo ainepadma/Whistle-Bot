@@ -1241,6 +1241,7 @@ var petApp = (() => {
       startingState: "sit-idle" /* sitIdle */,
       sequenceStates: [
         { state: "sit-idle" /* sitIdle */, possibleNextStates: ["walk-right" /* walkRight */, "run-right" /* runRight */] },
+        { state: "lie" /* lie */, possibleNextStates: ["lie" /* lie */] },
         { state: "walk-right" /* walkRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
         { state: "run-right" /* runRight */, possibleNextStates: ["walk-left" /* walkLeft */, "run-left" /* runLeft */] },
         { state: "walk-left" /* walkLeft */, possibleNextStates: ["sit-idle" /* sitIdle */] },
@@ -5203,6 +5204,27 @@ var petApp = (() => {
           break;
         case "tick":
           onTick();
+          break;
+        case "pet-sleep":
+          allPets.pets.forEach((petItem) => {
+            const pet2 = petItem.pet;
+            pet2.currentStateEnum = "lie" /* lie */;
+            pet2.currentState = resolveState("lie" /* lie */, pet2);
+            pet2.holdState = void 0;
+            pet2.holdStateEnum = void 0;
+          });
+          break;
+        case "pet-wake":
+          allPets.pets.forEach((petItem) => {
+            const pet2 = petItem.pet;
+            if (pet2.currentStateEnum === "lie" /* lie */) {
+              pet2.currentStateEnum = "sit-idle" /* sitIdle */;
+              pet2.currentState = resolveState("sit-idle" /* sitIdle */, pet2);
+              pet2.positionBottom(pet2.floor);
+              pet2.holdState = void 0;
+              pet2.holdStateEnum = void 0;
+            }
+          });
           break;
       }
     });

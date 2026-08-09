@@ -14,6 +14,8 @@ Windows 桌面宠物应用 Beta 版。
 - 打字联动：打字时随机宠物随输入速度上升，停止后缓慢下降 /
   Typing-reactive pets: a random pet rises with typing speed and slowly descends
   when you stop typing
+- 长时间不打字自动睡觉，打字即醒 / Falls asleep after a long typing pause
+  and wakes up when you type
 - 悬停或点击宠物会与它互动 / Hover or click pets to interact with them
 - 系统托盘菜单 + 宠物右键菜单：切换宠物 /
   System tray menu + right-click pet menu: switch pets
