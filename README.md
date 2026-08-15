@@ -1,73 +1,121 @@
-# 江海小鹞 · Banyao Desktop Pets
+# 小鹞 WhistleBot 预览版 v1.0.0
 
-Windows 桌面宠物应用。
+> 版本标识：**WhistleBot v1.0.0**  
+> 发布者：**Ainepadma**  
+> 研发团队：**东南大学 声绘鹞影实践团**  
+> 平台：仅支持 Windows 10 / 11 x64  
+> 版本日期：2026-08-15
 
-本项目基于 [tonybaloney/vscode-pets](https://github.com/tonybaloney/vscode-pets)
-开源项目（MIT 协议）移植。
+小鹞 WhistleBot 是一款基于三维哨口模型表情组件构建的 Windows 桌面宠物。程序追求最小安装包与源码体积，采用「Bootstrap 引导器 + 单文件主程序 + WebView2 前端」架构。
 
-当前版本：**Beta v0.3.0**
+## 目录结构与文件分类
 
-应用启动后直接放出桌宠，没有多余的页面。
-
-## 功能
-
-- 内置桌宠：彩绘蝴蝶风筝（原生分辨率素材）
-- 全屏透明置顶窗口，鼠标点击默认穿透，悬停到宠物上才可交互
-- 悬停/点击宠物会与它互动
-- 系统托盘 + 宠物右键菜单：切换宠物、切换主题（无/森林/城堡/海滩/冬季/秋日）、
-  调整大小（nano/small/medium/large）、退出
-- 显示区域可选：全屏 / 左侧四分之一 / 右侧四分之一 / 小窗口
-  （默认均位于 Windows 任务栏上方）
-- 打字联动：打字时随机一只宠物随输入速度上升，停止输入后缓慢下降
-- 睡觉：长时间不打字（默认 60 秒）自动入睡，打字即醒
-- 宠物状态自动保存，重启后恢复
-
-## 打开 / 隐藏 / 关闭
-
-- **打开**：从本仓库 [Releases](../../releases) 下载便携版或安装版并运行；
-  以后每次开机手动启动
-- **隐藏**：右键托盘图标选「显示 / 隐藏宠物」
-- **重新打开**：按 `Ctrl+Alt+P`，或点击任务栏通知区的托盘图标
-- **退出**：右键托盘图标选「退出」
-- **管理宠物**：右键宠物或托盘图标
-
-> 托盘图标在 Windows 里可能被收进通知区的「^」隐藏区域，点开箭头后把图标拖到外面，
-> 以后就能一直看到；隐藏宠物后应用仍驻留托盘，不会真正关闭。
-
-## 快速开始
-
-```bash
-cd electron
-npm install
-npm start        # 启动桌宠
-npm run dev      # 启动并打开 DevTools
 ```
+DesktopPet/
+├─ src/                        # 源码（需编译）
+│  ├─ PetApp/                  # 桌宠主程序源码（.NET 9 + WebView2）
+│  │  ├─ Program.cs            #   程序入口
+│  │  ├─ MainForm.cs           #   主窗体：透明置顶窗口、行为调度、右键菜单定位
+│  │  ├─ MenuForm.cs           #   独立菜单窗口（网页菜单承载）
+│  │  ├─ NativeInput.cs        #   系统空闲检测与全局键盘钩子
+│  │  ├─ PetApp.csproj         #   工程文件
+│  │  └─ wwwroot/              #   前端资源（表情组件、菜单页面）
+│  │     ├─ index.html         #     宠物页面
+│  │     ├─ pet.js             #     表情行为状态机与交互
+│  │     ├─ pet.css            #     宠物与菜单样式
+│  │     ├─ original-data.js   #     表情模型数据
+│  │     ├─ menu.html          #     右键菜单页面
+│  │     └─ menu.js            #     菜单交互与自适应尺寸
+│  └─ Bootstrap/               # 启动引导器源码（.NET Framework 4.8）
+│     ├─ Program.cs            #   检测/安装 .NET 9 运行时并启动 Pet.exe
+│     └─ Bootstrap.csproj      #   工程文件
+├─ build.ps1                   # 构建脚本（生成 dist\ 下全部产物）
+├─ installer.iss               # Inno Setup 安装包脚本
+├─ .gitignore                  # 版本控制忽略规则
+└─ README.md                   # 本文档
+
+dist/                          # 发布文件（由构建生成，无需进入源码）
+├─ DesktopPet-win-x64/         # 绿色版：解压即用
+├─ DesktopPet-win-x64.zip      # 绿色版压缩包
+├─ DesktopPet-win-x64-setup.exe# 安装包（最终交付物）
+├─ Pet/                        # PetApp 发布中间产物
+└─ Bootstrap/                  # Bootstrap 构建中间产物
+```
+
+**源码**：`src/` 下所有 `.cs`、`.csproj`、`wwwroot/` 前端文件，以及 `build.ps1`、`installer.iss`、`README.md`、`.gitignore`。
+
+**发布文件**：`dist/` 下所有内容。最终交付只需 `DesktopPet-win-x64-setup.exe`，或绿色版 `DesktopPet-win-x64.zip`（解压后双击 `Bootstrap.exe`）。
+
+**自动生成、不纳入源码**：`src/**/bin`、`src/**/obj`（编译中间文件，已由 `.gitignore` 忽略），以及 `dist/`（构建产物）。
+
+## 架构
+
+```
+Bootstrap.exe（~8 KB，.NET Framework 4.8，Windows 自带）
+  └─ 检测 .NET 9 Desktop Runtime
+       ├─ 已安装 → 直接启动 Pet.exe
+       └─ 未安装 → 弹窗引导：一键安装（官方 dotnet-install，免管理员）或打开下载页
+
+Pet.exe（~1.2 MB，.NET 9 框架依赖单文件 + WebView2）
+  ├─ 无边框置顶透明窗口，仅模型区域可交互
+  ├─ GetLastInputInfo()：系统级空闲检测（电脑长时间待机）
+  ├─ WH_KEYBOARD_LL：全局键盘钩子（敲键盘检测）
+  ├─ 窗口内鼠标事件（互动、拖拽、右键菜单）
+  └─ WebView2 加载 wwwroot（HTML/SVG/JS 表情组件）
+       └─ 行为状态机：出现 / 待机 / 无互动 / 互动 / 敲键盘 / 系统待机 / 消失
+```
+
+## 行为场景与表情分组
+
+| 场景 | 触发条件 | 表情池 |
+|---|---|---|
+| 出现 | 启动 | spawning / waking / excited |
+| 待机 | 默认 | idle / listening / humming / loading / orbit / radar / progress |
+| 无互动 | 2 分钟没碰宠物 | bored / confused / shy / sad / suspicious |
+| 互动 | 鼠标进入 / 点击 | happy / curious / playful / laughing / proud / celebrate / bouncing / surprised / scared |
+| 敲键盘 | 全局键盘输入 | thinking / searching / working / writing / dictating / receiving / sending / uploading / notifying / alerting / dragging |
+| 系统待机 | 系统空闲 > 5 分钟 | sleeping / drowsy |
+| 消失 | 点击关闭 | powering-down / sleeping → 动画后退出 |
 
 ## 构建
 
-```bash
-npm run build:win           # Windows 便携版
-npm run build:win:installer # Windows 安装包
+环境要求：
+
+- Windows 10/11 x64
+- .NET 9 SDK（编译 PetApp）
+- .NET Framework 4.8 Developer Pack（编译 Bootstrap，通常随 VS 或 SDK 自带）
+- 打包安装包还需 Inno Setup 6（本机路径示例：`%LOCALAPPDATA%\InnoSetup6\ISCC.exe`）
+
+生成绿色版产物：
+
+```powershell
+.\build.ps1
 ```
 
-构建产物位于 `electron/dist/`，并同步复制到本地根目录 `release/`（不入库，
-发布时作为 GitHub Release 附件上传）。
+产物输出到 `dist\`：
 
-## 目录
+- `DesktopPet-win-x64\Bootstrap.exe` — 双击入口（自动检测 / 引导安装 .NET 9 运行时）
+- `DesktopPet-win-x64\Pet.exe` — 桌宠主程序
+- `DesktopPet-win-x64\wwwroot\` — 前端资源
+- `DesktopPet-win-x64.zip` — 上述内容的压缩包
 
-```
-├── electron/
-│   ├── vscode-pets/  # 桌宠应用源码（主进程、渲染页、宠物素材）
-│   ├── build/        # 应用图标
-│   └── package.json
-├── release/          # 本地构建产物（不入库，见 GitHub Releases）
-├── third_party/      # 本地参考：上游源码（不入库，需自行 clone）
-├── LICENSE
-├── THIRD_PARTY_NOTICES.md
-└── README.md
+生成安装包：
+
+```powershell
+& "$env:LOCALAPPDATA\InnoSetup6\ISCC.exe" .\installer.iss
 ```
 
-## License
+产物：`dist\DesktopPet-win-x64-setup.exe`
 
-本仓库代码基于 MIT 协议（见 [LICENSE](LICENSE)）；
-第三方素材许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+## 运行
+
+- 安装包：运行 `DesktopPet-win-x64-setup.exe`，按向导安装后自动启动。
+- 绿色版：解压 `DesktopPet-win-x64.zip`，双击 `Bootstrap.exe`（首次若缺 .NET 9 运行时，会提示一键安装）。
+- 拖动宠物可移动；左键点击互动；右键打开菜单（样式 / 设置 / 隐藏 / 退出）；托盘图标可显示 / 退出。
+
+## 体积与依赖
+
+- Pet.exe + wwwroot ≈ 1.3 MB（框架依赖单文件）
+- Bootstrap.exe ≈ 8 KB
+- 安装包 ≈ 2.3 MB
+- 目标机器需：.NET 9 Desktop Runtime（引导器可自动安装）+ WebView2（Win10/11 基本自带）

@@ -1,0 +1,42 @@
+*{box-sizing:border-box;user-select:none;-webkit-user-select:none}
+html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+.pet-window{position:fixed;inset:0;background:transparent}
+.pet-stage{position:absolute;inset:0;display:grid;place-items:center;background:transparent;touch-action:none}
+.pet-bot{width:236px;height:236px;overflow:visible;filter:drop-shadow(0 14px 12px rgba(35,48,80,.22));transform-origin:50% 50%;cursor:grab}
+.body{fill:var(--pet-color, #2f86ed)}
+.eye{fill:#fff}
+.detail-seam{fill:#2B1810;opacity:.9}
+.detail-mouth{fill:#24130D}
+.orbit{fill:none;stroke:#e36f3d;stroke-width:1;stroke-dasharray:5 6;opacity:0}
+.pet-tooltip{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);padding:5px 12px;border-radius:99px;background:rgba(23,24,19,.78);color:#fff;font-size:11px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .25s}
+.pet-tooltip.show{opacity:1}
+.pet-menu{position:fixed;z-index:10;min-width:150px;padding:5px;border-radius:12px;background:rgba(255,253,247,.97);border:1px solid #d8d4c8;box-shadow:0 10px 24px rgba(35,48,80,.22)}
+.pet-menu button{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;background:transparent;text-align:left;font-size:12px;color:#171813;border-radius:8px;cursor:pointer;white-space:nowrap}
+.pet-menu button:hover{background:#eef1fb;color:#2f86ed}
+.pet-menu button i{font-style:normal;color:#96978f;font-size:10px}
+.pet-menu .pet-sub{padding:2px 0 4px 10px;border-left:1px solid #e4e1d8;margin-left:8px}
+.pet-menu .pet-sub-label{font:10px ui-monospace,monospace;color:#96978f;padding:4px 6px}
+.pet-colors{display:flex;gap:5px;padding:4px 6px 6px}
+.pet-colors button{width:18px;height:18px;padding:0;border-radius:50%;border:1px solid rgba(0,0,0,.15)}
+.pet-colors button.on{outline:2px solid #171813;outline-offset:1px}
+.pet-sizes{display:flex;gap:6px;padding:4px 6px 6px}
+.pet-sizes button{justify-content:center;width:38px;padding:5px 0;border:1px solid #d8d4c8;border-radius:8px}
+.pet-sizes button.on{border-color:#2f86ed;color:#2f86ed;background:#eef1fb}
+.pet-menu .pet-toggle b{font:10px ui-monospace,monospace;color:#96978f}
+
+@keyframes appear{from{transform:scale(.15) translateY(34px);opacity:0}55%{transform:scale(1.1) translateY(-5px);opacity:1}to{transform:scale(1) translateY(0);opacity:1}}
+@keyframes despawn{to{transform:scale(.12) translateY(26px);opacity:0}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025,.975)}}
+@keyframes sleep{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(.97,1.03) rotate(-1.3deg)}}
+@keyframes droop{0%,100%{transform:translateY(0) scale(1)}50%{transform:scale(.96,1)}}
+@keyframes bounce{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-28px) scale(.95,1.05)}65%{transform:translateY(5px) scale(1.06,.93)}}
+@keyframes scan{0%,100%{transform:translateX(0)}30%{transform:translateX(-20px)}70%{transform:translateX(18px)}}
+@keyframes typing{0%,100%{transform:rotate(0) translateX(0)}30%{transform:rotate(-2.5deg) translateX(-3px)}70%{transform:rotate(2.5deg) translateX(3px)}}
+.anim-appear{animation:appear .85s cubic-bezier(.3,.8,.4,1) both}
+.anim-despawn{animation:despawn .95s ease both}
+.anim-breathe{animation:breathe 3.4s ease-in-out infinite}
+.anim-sleep{animation:sleep 4.2s ease-in-out infinite}
+.anim-droop{animation:droop 2.8s ease-in-out infinite}
+.anim-bounce{animation:bounce .9s ease 3}
+.anim-scan{animation:scan .95s ease infinite}
+.anim-typing{animation:typing .8s ease infinite}

@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>桌宠菜单</title><link rel="stylesheet" href="pet.css"></head><body>
+<div class="pet-menu" id="pet-menu" style="position:fixed;left:4px;top:4px">
+  <button type="button" data-action="toggle-style">样式 <i>▾</i></button>
+  <div class="pet-sub" id="pet-sub-style" hidden>
+    <div class="pet-sub-label">颜色</div>
+    <div class="pet-colors" id="pet-colors"></div>
+    <div class="pet-sub-label">尺寸</div>
+    <div class="pet-sizes" id="pet-sizes"></div>
+  </div>
+  <button type="button" data-action="toggle-settings">设置 <i>▾</i></button>
+  <div class="pet-sub" id="pet-sub-settings" hidden>
+    <button type="button" class="pet-toggle" data-action="autostart"><span>开机自启动</span><b id="autostart-state">关</b></button>
+    <button type="button" data-action="shortcut">创建桌面快捷方式</button>
+    <button type="button" data-action="uninstall">卸载</button>
+  </div>
+  <button type="button" data-action="hide">隐藏</button>
+  <button type="button" data-action="quit">退出</button>
+</div>
+<script src="./menu.js"></script>
+</body></html>
