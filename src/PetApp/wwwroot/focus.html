@@ -1,0 +1,41 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>专注计时</title><link rel="stylesheet" href="focus.css"></head><body>
+<main class="focus-panel" id="focus-panel">
+  <header class="focus-head">
+    <div class="focus-title">专注计时</div>
+    <button type="button" class="focus-close" data-action="close" title="关闭">×</button>
+  </header>
+  <div class="focus-presets" id="focus-presets"></div>
+  <div class="focus-custom" id="focus-custom" hidden>
+    <div class="focus-custom-row">
+      <label for="fc-focus">专注</label>
+      <input type="number" id="fc-focus" min="1" max="180" step="1">
+      <span>分</span>
+      <label for="fc-break">休息</label>
+      <input type="number" id="fc-break" min="1" max="120" step="1">
+      <span>分</span>
+    </div>
+    <div class="focus-custom-row">
+      <label for="fc-long">长休</label>
+      <input type="number" id="fc-long" min="1" max="240" step="1">
+      <span>分</span>
+      <label for="fc-rounds">每</label>
+      <input type="number" id="fc-rounds" min="1" max="8" step="1">
+      <span>轮</span>
+      <button type="button" id="btn-apply-custom">应用</button>
+    </div>
+  </div>
+  <div class="focus-time" id="focus-time">25:00</div>
+  <div class="focus-track"><div class="focus-fill" id="focus-fill"></div></div>
+  <div class="focus-meta">
+    <span class="focus-phase" id="focus-phase">准备专注</span>
+    <span class="focus-dots" id="focus-dots"></span>
+  </div>
+  <div class="focus-note" id="focus-note" hidden></div>
+  <div class="focus-actions">
+    <button type="button" id="btn-toggle" data-action="toggle">开始</button>
+    <button type="button" data-action="reset">重置</button>
+    <button type="button" data-action="skip">跳过</button>
+  </div>
+</main>
+<script src="./focus.js"></script>
+</body></html>
