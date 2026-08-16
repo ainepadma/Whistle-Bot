@@ -50,7 +50,17 @@ Pet.exe（.NET 9 框架依赖单文件 + WebView2）
 
 ```
 DesktopPet/
+├─ assets/                     # 应用图标（app.ico / 预览 PNG / SVG 源文件）
+│  ├─ app.ico                  #   应用图标（多尺寸）
+│  ├─ icon-preview.png         #   图标预览
+│  └─ whistle-icon.svg         #   哨口造型 SVG 源文件
 ├─ src/                        # 源码
+│  ├─ Bootstrap/               # 启动引导器（.NET Framework 4.8）
+│  │  ├─ Bootstrap.csproj      #   工程文件
+│  │  └─ Program.cs            #   入口：检测 .NET 9 运行时并引导启动 Pet.exe
+│  ├─ FocusTimer.Tests/        # 番茄钟单元测试（零依赖控制台测试）
+│  │  ├─ FocusTimer.Tests.csproj
+│  │  └─ Program.cs
 │  ├─ PetApp/                  # 桌宠主程序（.NET 9 + WebView2）
 │  │  ├─ Program.cs            #   入口
 │  │  ├─ MainForm.cs           #   主窗体、行为调度、菜单定位
@@ -58,26 +68,23 @@ DesktopPet/
 │  │  ├─ FocusForm.cs          #   番茄钟浮层窗口
 │  │  ├─ FocusTimerService.cs  #   番茄钟计时服务（墙钟计时 + JSON 持久化）
 │  │  ├─ NativeInput.cs        #   空闲检测与键盘钩子
+│  │  ├─ WebAssets.cs          #   wwwroot 页面 URI（缓存破坏版本号）
 │  │  ├─ PetApp.csproj         #   工程文件
-│  │  └─ wwwroot/              #   前端资源（宠物页面 / 菜单页面 / 番茄钟页面）
-│  ├─ FocusTimer.Tests/        # 番茄钟单元测试（零依赖控制台测试）
-│  └─ Bootstrap/               # 启动引导器（.NET Framework 4.8）
-│     ├─ Program.cs
-│     └─ Bootstrap.csproj
+│  │  └─ wwwroot/              #   前端资源（HTML/SVG/JS/CSS）
+│  │     ├─ index.html         #   桌宠主页面
+│  │     ├─ menu.html          #   右键菜单页面
+│  │     ├─ menu.js            #   菜单逻辑
+│  │     ├─ focus.html         #   番茄钟浮层页面
+│  │     ├─ focus.css / focus.js  # 番茄钟样式与逻辑
+│  │     ├─ pet.css / pet.js   #   桌宠样式与交互
+│  │     └─ original-data.js   #   表情组件模型数据
 ├─ build.ps1                   # 构建脚本
 ├─ installer.iss               # Inno Setup 安装包脚本
-├─ assets/                     # 应用图标（app.ico / SVG 源文件 / 预览）
 ├─ tools/                      # 图标生成脚本 make-icon.ps1
 ├─ README.md                   # 本文件（仓库主页）
 ├─ RELEASE.md                  # 发布版说明（Release 页面）
 └─ .gitignore
 
-dist/                          # 发布产物（由构建生成，不入库）
-├─ DesktopPet-win-x64/         # 绿色版目录
-├─ DesktopPet-win-x64.zip      # 绿色版压缩包
-├─ DesktopPet-win-x64-setup.exe# 安装包
-├─ Pet/                        # 主程序发布中间产物
-└─ Bootstrap/                  # 引导器构建中间产物
 ```
 
 `src/**/bin`、`src/**/obj` 为编译中间文件，已加入 `.gitignore`，不纳入版本管理。
