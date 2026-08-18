@@ -1,0 +1,20 @@
+/* 日程色块基础样式 */
+.event-block {
+    @apply absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-xs cursor-pointer overflow-hidden transition-all duration-100;
+    @apply hover:brightness-95 hover:shadow-sm active:scale-[0.98];
+    min-height: 1.25rem;
+}
+
+/* 当前时间线（红色指示线） */
+.current-time-line {
+    @apply absolute left-0 right-0 border-t-2 border-red-500 z-10 pointer-events-none;
+}
+
+.current-time-dot {
+    @apply absolute -left-[5px] -top-[5px] w-2.5 h-2.5 rounded-full bg-red-500;
+}
+
+/* 日程拖拽预览 */
+.event-drag-preview {
+    @apply opacity-70 shadow-lg ring-2 ring-zinc-400;
+}

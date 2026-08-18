@@ -1,8 +1,8 @@
 *{box-sizing:border-box;user-select:none;-webkit-user-select:none}
-html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;text-rendering:optimizeLegibility;font-synthesis:none}
 .pet-window{position:fixed;inset:0;background:transparent}
-.pet-stage{position:absolute;inset:0;display:grid;place-items:center;padding-top:70px;background:transparent;touch-action:none}
-.pet-bot{width:var(--pet-size,236px);height:var(--pet-size,236px);overflow:visible;filter:drop-shadow(0 14px 12px rgba(35,48,80,.22));transform-origin:50% 50%;cursor:grab}
+.pet-stage{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:54px 12px 18px;background:transparent;touch-action:none}
+.pet-bot{flex:0 0 auto;width:var(--pet-size,100px);height:var(--pet-size,100px);overflow:visible;filter:drop-shadow(0 14px 12px rgba(35,48,80,.22));transform-origin:50% 50%;cursor:grab}
 .body{fill:var(--pet-color, #2f86ed)}
 .eye{fill:#fff}
 .detail-seam{fill:#2B1810;opacity:.9}

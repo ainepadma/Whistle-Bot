@@ -9,3 +9,7 @@ dist/
 .vs/
 *.user
 *.suo
+
+# Schedule WebView build inputs / outputs
+src/Motodo.Web/node_modules/
+src/PetApp/wwwroot/motodo/

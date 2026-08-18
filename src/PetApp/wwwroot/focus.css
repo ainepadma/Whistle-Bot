@@ -1,5 +1,5 @@
 *{box-sizing:border-box;user-select:none;-webkit-user-select:none}
-html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+html,body{margin:0;padding:0;background:transparent;overflow:hidden;font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;text-rendering:optimizeLegibility;font-synthesis:none}
 .focus-panel{position:fixed;left:4px;top:4px;width:272px;padding:12px 12px 10px;border-radius:14px;background:rgba(255,253,247,.98);border:1px solid #d8d4c8;box-shadow:0 10px 24px rgba(35,48,80,.22);cursor:grab;touch-action:none}
 .focus-panel.dragging{cursor:grabbing}
 .focus-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}

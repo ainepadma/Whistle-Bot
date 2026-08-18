@@ -7,10 +7,12 @@ using System.Windows.Forms;
 using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using PetApp.Schedule;
+using PetApp.DesktopCards;
 
 namespace PetApp;
 
-public sealed class MainForm : Form
+public sealed class MainForm : Form, IScheduleDesktopHost
 {
     /// <summary>Extra transparent space above the pet where typing notes
     /// animate. The web view shifts the model down by this amount so the
@@ -32,6 +34,7 @@ public sealed class MainForm : Form
     private readonly NotifyIcon _tray;
     private MenuForm? _menuForm;
     private string _petColor = "#2f86ed";
+    private int _petSize;
     private bool _noteZoneActive;
     private Point _menuAnchor;
     private Size? _collapsedSize;
@@ -40,6 +43,11 @@ public sealed class MainForm : Form
     private Size? _bothSize;
     private FocusTimerService? _focusTimer;
     private FocusForm? _focusForm;
+    private CardHostManager? _cardHost;
+    private ScheduleStore? _scheduleStore;
+    private ReminderScheduler? _reminderScheduler;
+    private PlannerForm? _plannerForm;
+    private readonly UpdateService _updateService = new();
 
     private static readonly bool DebugMode =
         Environment.GetCommandLineArgs().Any(a => string.Equals(a, "debug=1", StringComparison.OrdinalIgnoreCase));
@@ -69,12 +77,15 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
+        AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleDimensions = new SizeF(96F, 96F);
         Text = "小鹞 WhistleBot";
         FormBorderStyle = FormBorderStyle.None;
         TopMost = true;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
-        Size = new Size(LoadSize(), LoadSize() + NoteHeadroom);
+        _petSize = LoadSize();
+        Size = new Size(_petSize, _petSize + NoteHeadroom);
         BackColor = Color.Black;
 
         _web.Dock = DockStyle.Fill;
@@ -86,6 +97,7 @@ public sealed class MainForm : Form
         var menu = new ContextMenuStrip();
         menu.Items.Add("显示", null, (_, _) => { Show(); WindowState = FormWindowState.Normal; });
         menu.Items.Add("专注计时", null, (_, _) => ShowFocus());
+        menu.Items.Add("日程", null, (_, _) => ShowPlanner());
         menu.Items.Add("退出", null, (_, _) => Close());
         _tray.ContextMenuStrip = menu;
         _tray.BalloonTipClicked += (_, _) => ShowFocus();
@@ -97,12 +109,15 @@ public sealed class MainForm : Form
         };
 
         Load += OnLoad;
+        DpiChanged += (_, _) => BeginInvoke((Action)ApplyPetRegion);
         FormClosing += (_, _) =>
         {
             NativeInput.StopKeyboardHook();
             _idleTimer.Stop();
             _noteZoneTimer.Stop();
             _focusTimer?.Dispose();
+            _cardHost?.Dispose();
+            _reminderScheduler?.Dispose();
             _tray.Visible = false;
             _tray.Dispose();
         };
@@ -115,17 +130,17 @@ public sealed class MainForm : Form
         var margins = new Margins { LeftWidth = -1, RightWidth = -1, TopHeight = -1, BottomHeight = -1 };
         DwmExtendFrameIntoClientArea(Handle, ref margins);
 
-        // Place the pet at the bottom-right of the primary screen.  WorkingArea
-        // is in physical pixels while Form size/location are DPI-scaled logical
-        // pixels, so convert explicitly to keep the window on screen at any DPI.
+        _scheduleStore = new ScheduleStore();
+        _scheduleStore.Initialize();
+        _reminderScheduler = new ReminderScheduler(_scheduleStore);
+        _reminderScheduler.RemindersDue += OnRemindersDue;
+        _reminderScheduler.Start();
+
+        // PerMonitorV2 exposes form bounds and working areas in the same
+        // physical-pixel coordinate space.
         var wa = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1024, 768);
-        var scale = DeviceDpi / 96f;
-        var logicalWa = new Rectangle(
-            (int)Math.Round(wa.X / scale),
-            (int)Math.Round(wa.Y / scale),
-            (int)Math.Round(wa.Width / scale),
-            (int)Math.Round(wa.Height / scale));
-        Location = new Point(logicalWa.Right - Width - 24, logicalWa.Bottom - Height - 24);
+        var margin = DpiLayout.ToDevice(this, 24);
+        Location = new Point(wa.Right - Width - margin, wa.Bottom - Height - margin);
 
         var userData = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -148,13 +163,13 @@ public sealed class MainForm : Form
         var indexUri = WebAssets.Page("index.html");
         var builder = new UriBuilder(indexUri);
         builder.Query = (string.IsNullOrEmpty(builder.Query) ? "" : builder.Query.TrimStart('?') + "&")
-            + "size=" + Width + "&color=" + _petColor;
+            + "size=" + _petSize + "&color=" + _petColor;
         var args = Environment.GetCommandLineArgs();
         if (args.Length > 1 && args[1].StartsWith("pos=", StringComparison.Ordinal))
             builder.Query += "&" + args[1];
         _web.CoreWebView2.Navigate(builder.Uri.ToString());
         Post(new { type = "set-color", color = _petColor });
-        Post(new { type = "size", size = Width });
+        Post(new { type = "size", size = _petSize });
         ApplyPetRegion();
 
         // Preload the menu form hidden/off-screen so its WebView is already
@@ -173,6 +188,9 @@ public sealed class MainForm : Form
         _focusTimer.StateChanged += OnFocusStateChanged;
         _focusTimer.PhaseFinished += OnFocusPhaseFinished;
         _focusTimer.Start();
+        _cardHost = new CardHostManager(_scheduleStore, this);
+        _cardHost.RestorePinnedCards();
+        _ = _updateService.CheckAsync(this, interactive: false);
 
         NativeInput.KeyDown += vk => Post(new { type = "typing", key = vk });
         NativeInput.StartKeyboardHook();
@@ -182,40 +200,12 @@ public sealed class MainForm : Form
     /// do not swallow clicks and only the model itself is interactive.</summary>
     private void ApplyPetRegion()
     {
-        try
-        {
-            var scale = Width / 229f;
-            var numbers = Regex.Matches(WhistlePath, @"-?\d+(?:\.\d+)?")
-                .Select(m => float.Parse(m.Value, System.Globalization.CultureInfo.InvariantCulture))
-                .ToArray();
-            var path = new GraphicsPath();
-            var current = new PointF(numbers[0] * scale, numbers[1] * scale);
-            path.AddLine(current, current);
-            for (var i = 2; i + 5 < numbers.Length; i += 6)
-            {
-                var c1 = new PointF(numbers[i] * scale, numbers[i + 1] * scale);
-                var c2 = new PointF(numbers[i + 2] * scale, numbers[i + 3] * scale);
-                var end = new PointF(numbers[i + 4] * scale, numbers[i + 5] * scale);
-                path.AddBezier(current, c1, c2, end);
-                current = end;
-            }
-            path.CloseFigure();
-            using (var m = new Matrix())
-            {
-                m.Translate(0, NoteHeadroom);
-                path.Transform(m);
-            }
-            var region = new Region(path);
-            // While typing notes animate above the pet, include a transparent
-            // note zone so the pop-up notes are not clipped by the silhouette.
-            if (_noteZoneActive)
-                region.Union(new Region(new Rectangle((Width - 140) / 2, 0, 140, NoteHeadroom + 40)));
-            Region = region;
-        }
-        catch
-        {
-            // Keep the full window if the path fails to parse.
-        }
+        // Do not apply a native shape Region. WebView2 and WinForms can use
+        // different coordinate spaces under per-monitor DPI, so even a
+        // mathematically matching path may clip animated SVG pixels. DWM glass
+        // already keeps every transparent WebView pixel visually transparent.
+        Region?.Dispose();
+        Region = null;
     }
 
     private void Post(object message)
@@ -243,7 +233,9 @@ public sealed class MainForm : Form
                 case "drag":
                     var dx = root.GetProperty("dx").GetInt32();
                     var dy = root.GetProperty("dy").GetInt32();
-                    Location = new Point(Location.X + dx, Location.Y + dy);
+                    Location = new Point(
+                        Location.X + DpiLayout.ToDevice(this, dx),
+                        Location.Y + DpiLayout.ToDevice(this, dy));
                     break;
                 case "note-spawn":
                     _noteZoneActive = true;
@@ -295,14 +287,15 @@ public sealed class MainForm : Form
         {
             type = "state",
             color = _petColor,
-            size = Width,
+            size = _petSize,
             autostart = IsAutostartEnabled()
         });
         var client = new Point(
             pageWidth > 0 ? (int)Math.Round(pagePos.X * (ClientSize.Width / (float)pageWidth)) : pagePos.X,
             pageHeight > 0 ? (int)Math.Round(pagePos.Y * (ClientSize.Height / (float)pageHeight)) : pagePos.Y);
         _menuAnchor = PointToScreen(client);
-        _menuForm.Size = _collapsedSize ?? new Size(200, 160);
+        var menuSize = _collapsedSize ?? new Size(200, 160);
+        _menuForm.Size = DpiLayout.ToDevice(_menuForm, menuSize);
         PositionPetMenu();
         _menuForm.Show();
         _menuForm.Activate();
@@ -313,23 +306,17 @@ public sealed class MainForm : Form
         if (_menuForm == null) return;
         var w = _menuForm.Width;
         var h = _menuForm.Height;
-        var wa = Screen.PrimaryScreen?.WorkingArea ?? Rectangle.Empty;
-        var s = DeviceDpi / 96f;
-        var logicalWa = new Rectangle(
-            (int)Math.Round(wa.X / s),
-            (int)Math.Round(wa.Y / s),
-            (int)Math.Round(wa.Width / s),
-            (int)Math.Round(wa.Height / s));
+        var wa = Screen.FromPoint(_menuAnchor).WorkingArea;
 
         // The menu's top-left sits at the right-click point and only flips at
         // screen edges like a normal context menu. Expanding the style/settings
         // sections grows the same window in place from this anchor.
         var x = _menuAnchor.X;
         var y = _menuAnchor.Y;
-        if (x + w > logicalWa.Right) x = Math.Max(logicalWa.Left, _menuAnchor.X - w);
-        if (y + h > logicalWa.Bottom) y = Math.Max(logicalWa.Top, _menuAnchor.Y - h);
-        x = Math.Clamp(x, logicalWa.Left, Math.Max(logicalWa.Left, logicalWa.Right - w));
-        y = Math.Clamp(y, logicalWa.Top, Math.Max(logicalWa.Top, logicalWa.Bottom - h));
+        if (x + w > wa.Right) x = Math.Max(wa.Left, _menuAnchor.X - w);
+        if (y + h > wa.Bottom) y = Math.Max(wa.Top, _menuAnchor.Y - h);
+        x = Math.Clamp(x, wa.Left, Math.Max(wa.Left, wa.Right - w));
+        y = Math.Clamp(y, wa.Top, Math.Max(wa.Top, wa.Bottom - h));
         _menuForm.Location = new Point(x, y);
     }
 
@@ -342,14 +329,15 @@ public sealed class MainForm : Form
                 {
                     type = "state",
                     color = _petColor,
-                    size = Width,
+                    size = _petSize,
                     autostart = IsAutostartEnabled()
                 });
                 break;
             case "color":
                 _petColor = root.GetProperty("color").GetString() ?? "#2f86ed";
-                SaveConfig(Width, _petColor);
+                SaveConfig(_petSize, _petColor);
                 Post(new { type = "set-color", color = _petColor });
+                ScheduleEventHub.Instance.Publish("pet:color", _petColor);
                 break;
             case "size":
                 ResizePet(root.GetProperty("size").GetInt32());
@@ -359,6 +347,10 @@ public sealed class MainForm : Form
                 break;
             case "shortcut":
                 CreateDesktopShortcut();
+                break;
+            case "update-check":
+                _menuForm?.Hide();
+                _ = _updateService.CheckAsync(this, interactive: true);
                 break;
             case "about":
                 OpenAbout();
@@ -376,6 +368,7 @@ public sealed class MainForm : Form
                 _menuForm?.Hide();
                 ShowFocus();
                 break;
+
             case "close-menu":
                 _menuForm?.Hide();
                 break;
@@ -435,6 +428,7 @@ public sealed class MainForm : Form
     {
         var text = e.CompletedPhase switch
         {
+            "focus" when e.Skipped => $"本次专注已结束，记录 {Math.Max(0, e.ActualSeconds) / 60} 分钟。",
             "focus" when e.NextPhase == "long-break" => "专注完成！已完成一轮，来一次长休息吧。",
             "focus" => "专注完成！休息一下吧。",
             "long-break" => "长休息结束，已自动开始下一轮专注！",
@@ -449,6 +443,9 @@ public sealed class MainForm : Form
         }
         Post(new { type = "toast", text });
         _focusForm?.Post(new { type = "focus-finished", phase = e.CompletedPhase, next = e.NextPhase, text });
+        if (e.CompletedPhase == "focus" && !string.IsNullOrWhiteSpace(e.EventId) && e.ActualSeconds > 0)
+            _scheduleStore?.RecordFocusSession(e.EventId, e.PlannedSeconds, e.ActualSeconds, DateTimeOffset.UtcNow);
+        ScheduleEventHub.Instance.Publish("focus:finished", new { phase = e.CompletedPhase, next = e.NextPhase, text, eventId = e.EventId, plannedSeconds = e.PlannedSeconds, actualSeconds = e.ActualSeconds, skipped = e.Skipped });
         PushFocusState();
     }
 
@@ -469,30 +466,57 @@ public sealed class MainForm : Form
             customBreakMinutes = s.CustomBreakMinutes,
             customLongBreakMinutes = s.CustomLongBreakMinutes,
             customRounds = s.CustomRounds,
-            label = s.Label
+            label = s.Label,
+            activeEventId = s.ActiveEventId
         };
         Post(msg);
         _focusForm?.Post(msg);
+        ScheduleEventHub.Instance.Publish("focus:state", msg);
     }
 
+    private void ShowPlanner()
+    {
+        if (_scheduleStore is null) return;
+        _plannerForm ??= new PlannerForm(_scheduleStore, this);
+        _plannerForm.Show();
+        _plannerForm.WindowState = FormWindowState.Normal;
+        _plannerForm.Activate();
+    }
+
+    private void OnRemindersDue(int count)
+    {
+        if (IsDisposed) return;
+        try
+        {
+            BeginInvoke(() =>
+            {
+                var suffix = count == 1 ? "有一条日程待处理。" : $"有 {count} 条日程待处理。";
+                _tray.ShowBalloonTip(5000, "日程提醒", suffix, ToolTipIcon.Info);
+                _plannerForm?.NotifyReminders();
+                ScheduleEventHub.Instance.Publish("reminder:triggered", new { count });
+            });
+        }
+        catch
+        {
+        }
+    }
     private void ShowFocus()
     {
+        if (_cardHost != null)
+        {
+            _cardHost.Show("focus");
+            return;
+        }
         _focusForm ??= new FocusForm(OnFocusMessage);
         _focusForm.Hide();
-        var scale = DeviceDpi / 96f;
-        var wa = Screen.PrimaryScreen?.WorkingArea ?? Rectangle.Empty;
-        var logicalWa = new Rectangle(
-            (int)Math.Round(wa.X / scale),
-            (int)Math.Round(wa.Y / scale),
-            (int)Math.Round(wa.Width / scale),
-            (int)Math.Round(wa.Height / scale));
+        var wa = Screen.FromRectangle(Bounds).WorkingArea;
         var w = _focusForm.Width;
         var h = _focusForm.Height;
         var x = Location.X + (Width - w) / 2;
-        var y = Location.Y + NoteHeadroom - h - 10;
-        if (y < logicalWa.Top) y = Location.Y + Height + 10;
-        x = Math.Clamp(x, logicalWa.Left, Math.Max(logicalWa.Left, logicalWa.Right - w));
-        y = Math.Clamp(y, logicalWa.Top, Math.Max(logicalWa.Top, logicalWa.Bottom - h));
+        var y = Location.Y + DpiLayout.ToDevice(this, NoteHeadroom - 10) - h;
+        if (y < wa.Top) y = Location.Y + Height + 10;
+        x = Math.Clamp(x, wa.Left, Math.Max(wa.Left, wa.Right - w));
+        y = Math.Clamp(y, wa.Top, Math.Max(wa.Top, wa.Bottom - h));
         _focusForm.Location = new Point(x, y);
         PushFocusState();
         _focusForm.Show();
@@ -528,8 +552,8 @@ public sealed class MainForm : Form
             case "focus-drag":
                 if (_focusForm == null) break;
                 MoveFocusFormTo(
-                    _focusForm.Location.X + root.GetProperty("dx").GetInt32(),
-                    _focusForm.Location.Y + root.GetProperty("dy").GetInt32());
+                    _focusForm.Location.X + DpiLayout.ToDevice(_focusForm, root.GetProperty("dx").GetInt32()),
+                    _focusForm.Location.Y + DpiLayout.ToDevice(_focusForm, root.GetProperty("dy").GetInt32()));
                 break;
             case "focus-close":
                 _focusForm?.Hide();
@@ -537,21 +561,41 @@ public sealed class MainForm : Form
         }
     }
 
+    void IScheduleDesktopHost.ShowPlanner() => ShowPlanner();
+    void IScheduleDesktopHost.ShowCard(string kind) => _cardHost?.Show(kind);
+    void IScheduleDesktopHost.SwitchCard(string fromKind, string toKind) => _cardHost?.Switch(fromKind, toKind);
+    void IScheduleDesktopHost.CloseCard(string kind) => _cardHost?.Hide(kind);
+    bool IScheduleDesktopHost.IsCardVisible(string kind) => _cardHost?.IsVisible(kind) ?? false;
+    CardPresentation IScheduleDesktopHost.GetCardPresentation(string kind) => _cardHost?.Presentation(kind) ?? new CardPresentation(kind, false, false, false);
+    void IScheduleDesktopHost.BeginCardDrag(string kind) => _cardHost?.BeginDrag(kind);
+    void IScheduleDesktopHost.ToggleCardPinned(string kind) => _cardHost?.TogglePinned(kind);
+    void IScheduleDesktopHost.MoveCard(string kind, int deltaX, int deltaY) => _cardHost?.Move(kind, deltaX, deltaY);
+    bool IScheduleDesktopHost.IsAutostartEnabled() => IsAutostartEnabled();
+    void IScheduleDesktopHost.SetAutostartEnabled(bool enabled) => SetAutostart(enabled);
+    string IScheduleDesktopHost.GetPetColor() => _petColor;
+    FocusState IScheduleDesktopHost.GetFocusState() => _focusTimer?.GetState() ?? new FocusState();
+    void IScheduleDesktopHost.ToggleFocus() => _focusTimer?.Toggle();
+    void IScheduleDesktopHost.ResetFocus() => _focusTimer?.Reset();
+    void IScheduleDesktopHost.SkipFocus() => _focusTimer?.Skip();
+    void IScheduleDesktopHost.SetFocusPreset(string presetId) => _focusTimer?.SetPreset(presetId);
+    void IScheduleDesktopHost.SetFocusCustom(int minutes, int breakMinutes, int longBreakMinutes, int rounds) => _focusTimer?.SetCustom(minutes, breakMinutes, longBreakMinutes, rounds);
+    void IScheduleDesktopHost.StartFocusForEvent(string? eventId)
+    {
+        _focusTimer?.StartForEvent(eventId);
+        _cardHost?.Show("focus");
+    }
+    void IScheduleDesktopHost.DetachFocusEvent() => _focusTimer?.DetachEvent();
+    void IScheduleDesktopHost.ResizeCard(string kind, int width, int height) => _cardHost?.Resize(kind, width, height);
+
     private static int Prop(JsonElement root, string name, int fallback) =>
         root.TryGetProperty(name, out var el) ? el.GetInt32() : fallback;
 
     private void MoveFocusFormTo(int x, int y)
     {
         if (_focusForm == null) return;
-        var scale = DeviceDpi / 96f;
-        var wa = Screen.PrimaryScreen?.WorkingArea ?? Rectangle.Empty;
-        var logicalWa = new Rectangle(
-            (int)Math.Round(wa.X / scale),
-            (int)Math.Round(wa.Y / scale),
-            (int)Math.Round(wa.Width / scale),
-            (int)Math.Round(wa.Height / scale));
-        x = Math.Clamp(x, logicalWa.Left, Math.Max(logicalWa.Left, logicalWa.Right - _focusForm.Width));
-        y = Math.Clamp(y, logicalWa.Top, Math.Max(logicalWa.Top, logicalWa.Bottom - _focusForm.Height));
+        var wa = Screen.FromRectangle(_focusForm.Bounds).WorkingArea;
+        x = Math.Clamp(x, wa.Left, Math.Max(wa.Left, wa.Right - _focusForm.Width));
+        y = Math.Clamp(y, wa.Top, Math.Max(wa.Top, wa.Bottom - _focusForm.Height));
         _focusForm.Location = new Point(x, y);
     }
 
@@ -584,13 +628,8 @@ public sealed class MainForm : Form
         var cssHeight = root.GetProperty("cssHeight").GetInt32();
         var innerWidth = root.GetProperty("innerWidth").GetInt32();
         if (innerWidth <= 0) return;
-        // The WebView renders 1 CSS px = 1 logical px in this DPI-unaware host.
-        // Do not derive a live ratio from formWidth/innerWidth: right after a
-        // window resize the browser's innerWidth lags behind, which made the
-        // menu grow out of control. A fixed 1:1 conversion is stable.
-        // offsetWidth can exclude a classic vertical scrollbar; use the
-        // element's border-box right edge when it is larger so the window
-        // never clips the menu's right side.
+        // Browser measurements are CSS pixels. Convert once to the current
+        // monitor's physical pixels after calculating the stable logical size.
         var contentWidth = cssWidth;
         if (root.TryGetProperty("menuRect", out var mr))
         {
@@ -604,29 +643,23 @@ public sealed class MainForm : Form
         // collapsed size when the last submenu closes (keeps expand smooth).
         if (expanded)
         {
-            newWidth = Math.Max(newWidth, _menuForm.Width);
-            newHeight = Math.Max(newHeight, _menuForm.Height);
+            newWidth = Math.Max(newWidth, DpiLayout.ToLogical(_menuForm, _menuForm.Width));
+            newHeight = Math.Max(newHeight, DpiLayout.ToLogical(_menuForm, _menuForm.Height));
         }
-        _menuForm.Size = new Size(newWidth, newHeight);
+        _menuForm.Size = DpiLayout.ToDevice(_menuForm, new Size(newWidth, newHeight));
         Log($"fit css={cssWidth}x{cssHeight} inner={innerWidth} -> {newWidth}x{newHeight}");
         PositionPetMenu();
     }
 
     private void MovePetToEdge(string? pos)
     {
-        var wa = Screen.PrimaryScreen?.WorkingArea ?? Rectangle.Empty;
-        var s = DeviceDpi / 96f;
-        var logicalWa = new Rectangle(
-            (int)Math.Round(wa.X / s),
-            (int)Math.Round(wa.Y / s),
-            (int)Math.Round(wa.Width / s),
-            (int)Math.Round(wa.Height / s));
+        var wa = Screen.FromRectangle(Bounds).WorkingArea;
         switch (pos)
         {
-            case "tl": Location = new Point(logicalWa.Left, logicalWa.Top); break;
-            case "tr": Location = new Point(logicalWa.Right - Width, logicalWa.Top); break;
-            case "bl": Location = new Point(logicalWa.Left, logicalWa.Bottom - Height); break;
-            case "br": Location = new Point(logicalWa.Right - Width, logicalWa.Bottom - Height); break;
+            case "tl": Location = new Point(wa.Left, wa.Top); break;
+            case "tr": Location = new Point(wa.Right - Width, wa.Top); break;
+            case "bl": Location = new Point(wa.Left, wa.Bottom - Height); break;
+            case "br": Location = new Point(wa.Right - Width, wa.Bottom - Height); break;
         }
     }
 
@@ -781,16 +814,14 @@ public sealed class MainForm : Form
     private void ResizePet(int size)
     {
         size = Math.Clamp(size, 180, 420);
-        Size = new Size(size, size + NoteHeadroom);
-        var wa = Screen.PrimaryScreen?.WorkingArea ?? Rectangle.Empty;
+        _petSize = size;
+        Size = DpiLayout.ToDevice(this, new Size(size, size + NoteHeadroom));
+        var wa = Screen.FromRectangle(Bounds).WorkingArea;
         if (wa.Width > 0)
         {
-            var s = DeviceDpi / 96f;
-            var logicalW = (int)Math.Round(wa.Width / s);
-            var logicalH = (int)Math.Round(wa.Height / s);
             Location = new Point(
-                Math.Clamp(Location.X, 0, Math.Max(0, logicalW - size)),
-                Math.Clamp(Location.Y, 0, Math.Max(0, logicalH - size)));
+                Math.Clamp(Location.X, wa.Left, Math.Max(wa.Left, wa.Right - Width)),
+                Math.Clamp(Location.Y, wa.Top, Math.Max(wa.Top, wa.Bottom - Height)));
         }
         ApplyPetRegion();
         SaveConfig(size, _petColor);

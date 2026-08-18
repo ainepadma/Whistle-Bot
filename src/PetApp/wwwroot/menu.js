@@ -12,7 +12,7 @@
   const colorsRoot = document.querySelector('#pet-colors');
   const sizesRoot = document.querySelector('#pet-sizes');
   const autostartLabel = document.querySelector('#autostart-state');
-  let state = { color: '#2f86ed', size: 280, autostart: false };
+  let state = { color: '#2f86ed', size: 200, autostart: false };
 
   function post(msg) {
     if (window.chrome && chrome.webview) chrome.webview.postMessage(msg);
@@ -83,7 +83,7 @@
     chrome.webview.addEventListener('message', e => {
       const d = e.data;
       if (d.type === 'state') {
-        state = { color: d.color || '#2f86ed', size: d.size || 280, autostart: !!d.autostart };
+        state = { color: d.color || '#2f86ed', size: d.size || 200, autostart: !!d.autostart };
         render();
       } else if (d.type === 'reset') {
         subStyle.hidden = true;
@@ -147,6 +147,8 @@
       post({ type: 'autostart', enable: state.autostart });
     } else if (action === 'shortcut') {
       post({ type: 'shortcut' });
+    } else if (action === 'update-check') {
+      post({ type: 'update-check' });
     } else if (action === 'about') {
       post({ type: 'about' });
     } else if (action === 'uninstall') {

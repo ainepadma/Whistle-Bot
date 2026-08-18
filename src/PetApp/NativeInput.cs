@@ -44,6 +44,12 @@ internal static class NativeInput
     [DllImport("user32.dll")]
     private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
 
@@ -51,6 +57,14 @@ internal static class NativeInput
     private static IntPtr _hook;
 
     public static event Action<uint>? KeyDown;
+
+    public static void BeginWindowDrag(Form window)
+    {
+        const uint wmNcLButtonDown = 0x00A1;
+        const int htCaption = 2;
+        ReleaseCapture();
+        SendMessage(window.Handle, wmNcLButtonDown, (IntPtr)htCaption, IntPtr.Zero);
+    }
 
     /// <summary>Seconds since the last global mouse/keyboard input anywhere on the system.</summary>
     public static uint GetIdleSeconds()

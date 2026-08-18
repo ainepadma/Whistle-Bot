@@ -17,6 +17,7 @@ public sealed class FocusTimerService : IDisposable
     private int _customLongBreakMinutes = 15;
     private int _customRounds = 6;
     private DateTime? _endUtc;
+    private string? _activeEventId;
     private FocusFinishedEventArgs? _pendingRecovery;
     private bool _disposed;
 
@@ -65,6 +66,7 @@ public sealed class FocusTimerService : IDisposable
             _state.CustomBreakMinutes = _customBreakMinutes;
             _state.CustomLongBreakMinutes = _customLongBreakMinutes;
             _state.CustomRounds = _customRounds;
+            _state.ActiveEventId = _activeEventId;
             return _state.Clone();
         }
     }
@@ -94,6 +96,30 @@ public sealed class FocusTimerService : IDisposable
         RaiseStateChanged();
     }
 
+    /// <summary>Starts a new focus round associated with an optional schedule item.</summary>
+    public void StartForEvent(string? eventId)
+    {
+        lock (_gate)
+        {
+            if (_state.Status == "running") return;
+            ResetToIdleLocked();
+            _activeEventId = string.IsNullOrWhiteSpace(eventId) ? null : eventId;
+            BeginPhaseLocked("focus");
+            Save();
+        }
+        RaiseStateChanged();
+    }
+
+    public void DetachEvent()
+    {
+        lock (_gate)
+        {
+            _activeEventId = null;
+            Save();
+        }
+        RaiseStateChanged();
+    }
+
     /// <summary>Resets the current phase to its full duration and pauses.</summary>
     public void Reset()
     {
@@ -117,7 +143,7 @@ public sealed class FocusTimerService : IDisposable
         lock (_gate)
         {
             if (_state.Mode == "idle" || _state.Status == "idle") return;
-            finished = AdvanceLocked();
+            finished = AdvanceLocked(skipped: true);
             Save();
         }
         if (finished != null) RaisePhaseFinished(finished);
@@ -132,8 +158,10 @@ public sealed class FocusTimerService : IDisposable
             var isCustom = string.Equals(presetId, FocusPreset.CustomId, StringComparison.OrdinalIgnoreCase);
             if (!isCustom && FocusPreset.Find(presetId) == null) return;
             if (_state.Status == "running") return;
+            var activeEventId = _activeEventId;
             _state.PresetId = isCustom ? FocusPreset.CustomId : presetId;
             ResetToIdleLocked();
+            _activeEventId = activeEventId;
             Save();
         }
         RaiseStateChanged();
@@ -152,8 +180,10 @@ public sealed class FocusTimerService : IDisposable
             _customBreakMinutes = Math.Clamp(breakMinutes, 1, 120);
             _customLongBreakMinutes = Math.Clamp(longBreakMinutes, 1, 240);
             _customRounds = Math.Clamp(rounds, 1, 8);
+            var activeEventId = _activeEventId;
             _state.PresetId = FocusPreset.CustomId;
             ResetToIdleLocked();
+            _activeEventId = activeEventId;
             Save();
         }
         RaiseStateChanged();
@@ -202,11 +232,17 @@ public sealed class FocusTimerService : IDisposable
         _state.TotalSeconds = preset.FocusSeconds;
         _state.RemainingSeconds = _state.TotalSeconds;
         _endUtc = null;
+        _activeEventId = null;
     }
 
-    private FocusFinishedEventArgs AdvanceLocked()
+    private FocusFinishedEventArgs AdvanceLocked(bool skipped = false)
     {
         var completed = _state.Mode;
+        var completedEventId = completed == "focus" ? _activeEventId : null;
+        var completedSeconds = completed == "focus" ? _state.TotalSeconds : 0;
+        var actualSeconds = completed == "focus"
+            ? Math.Clamp(_state.TotalSeconds - RemainingLocked(), 0, _state.TotalSeconds)
+            : 0;
         var preset = CurrentPreset();
         if (completed == "focus")
         {
@@ -218,11 +254,11 @@ public sealed class FocusTimerService : IDisposable
             _state.RemainingSeconds = _state.TotalSeconds;
             _state.Status = "running";
             _endUtc = _clock().AddSeconds(_state.TotalSeconds);
-            return new FocusFinishedEventArgs(completed, next, false);
+                        return new FocusFinishedEventArgs(completed, next, false, completedEventId, completedSeconds, actualSeconds, skipped);
         }
         if (completed == "long-break") _state.CycleIndex = 0;
         BeginPhaseLocked("focus");
-        return new FocusFinishedEventArgs(completed, "focus", false);
+        return new FocusFinishedEventArgs(completed, "focus", false, completedEventId, completedSeconds, actualSeconds, skipped);
     }
 
     private int RemainingLocked() => _state.Status == "running" && _endUtc.HasValue
@@ -260,6 +296,7 @@ public sealed class FocusTimerService : IDisposable
             _state.TotalSeconds = p.TotalSeconds > 0 ? p.TotalSeconds : CurrentPreset().FocusSeconds;
             _state.RemainingSeconds = Math.Max(0, p.RemainingSeconds);
             _endUtc = p.EndTimeUtc;
+            _activeEventId = p.ActiveEventId;
             if (_state.Status == "running")
             {
                 if (_endUtc.HasValue)
@@ -294,9 +331,13 @@ public sealed class FocusTimerService : IDisposable
             var now = _clock();
             if (_state.Status != "running" || !_endUtc.HasValue || _endUtc.Value > now) return;
             var completed = _state.Mode;
+            FocusFinishedEventArgs? recoveredFocus = null;
             var guard = 0;
             while (_state.Status == "running" && _endUtc.HasValue && _endUtc.Value <= now && guard++ < 8)
-                AdvanceLocked();
+            {
+                var advanced = AdvanceLocked();
+                if (advanced.CompletedPhase == "focus" && recoveredFocus == null) recoveredFocus = advanced;
+            }
             if (_state.Status == "running")
             {
                 _state.Status = "paused";
@@ -304,7 +345,10 @@ public sealed class FocusTimerService : IDisposable
                 _endUtc = null;
             }
             Save();
-            _pendingRecovery = new FocusFinishedEventArgs(completed, _state.Mode, true);
+            _pendingRecovery = recoveredFocus == null
+                ? new FocusFinishedEventArgs(completed, _state.Mode, true)
+                : new FocusFinishedEventArgs(recoveredFocus.CompletedPhase, recoveredFocus.NextPhase, true,
+                    recoveredFocus.EventId, recoveredFocus.PlannedSeconds, recoveredFocus.ActualSeconds);
         }
     }
 
@@ -327,7 +371,8 @@ public sealed class FocusTimerService : IDisposable
                 CycleIndex = _state.CycleIndex,
                 TotalSeconds = _state.TotalSeconds,
                 RemainingSeconds = _state.Status == "running" ? RemainingLocked() : _state.RemainingSeconds,
-                EndTimeUtc = _state.Status == "running" ? _endUtc : null
+                EndTimeUtc = _state.Status == "running" ? _endUtc : null,
+                ActiveEventId = _activeEventId
             };
             File.WriteAllText(_path, JsonSerializer.Serialize(p));
         }
@@ -361,6 +406,7 @@ public sealed class FocusState
     public int CustomBreakMinutes { get; set; } = 5;
     public int CustomLongBreakMinutes { get; set; } = 15;
     public int CustomRounds { get; set; } = 6;
+    public string? ActiveEventId { get; set; }
 
     public string Label => Mode switch
     {
@@ -381,7 +427,8 @@ public sealed class FocusState
         CustomMinutes = CustomMinutes,
         CustomBreakMinutes = CustomBreakMinutes,
         CustomLongBreakMinutes = CustomLongBreakMinutes,
-        CustomRounds = CustomRounds
+        CustomRounds = CustomRounds,
+        ActiveEventId = ActiveEventId
     };
 }
 
@@ -430,11 +477,16 @@ public sealed class FocusPreset
 
 public sealed class FocusFinishedEventArgs : EventArgs
 {
-    public FocusFinishedEventArgs(string completedPhase, string nextPhase, bool recovered)
+    public FocusFinishedEventArgs(string completedPhase, string nextPhase, bool recovered, string? eventId = null,
+        int plannedSeconds = 0, int actualSeconds = 0, bool skipped = false)
     {
         CompletedPhase = completedPhase;
         NextPhase = nextPhase;
         Recovered = recovered;
+        EventId = eventId;
+        PlannedSeconds = plannedSeconds;
+        ActualSeconds = actualSeconds;
+        Skipped = skipped;
     }
 
     /// <summary>Phase that just completed: focus | short-break | long-break.</summary>
@@ -445,6 +497,10 @@ public sealed class FocusFinishedEventArgs : EventArgs
 
     /// <summary>True when the phase expired while the app was closed.</summary>
     public bool Recovered { get; }
+    public string? EventId { get; }
+    public int PlannedSeconds { get; }
+    public int ActualSeconds { get; }
+    public bool Skipped { get; }
 }
 
 /// <summary>Persisted layout, mirrored 1:1 to focus.json.</summary>
@@ -462,4 +518,5 @@ internal sealed class FocusPersist
     public int TotalSeconds { get; set; } = 1500;
     public int RemainingSeconds { get; set; } = 1500;
     public DateTime? EndTimeUtc { get; set; }
+    public string? ActiveEventId { get; set; }
 }

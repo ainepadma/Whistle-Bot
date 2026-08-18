@@ -1,5 +1,5 @@
-﻿#define MyAppName "小鹞 WhistleBot"
-#define MyAppVersion "1.1.0"
+#define MyAppName "小鹞 WhistleBot"
+#define MyAppVersion "1.2.0"
 #define MyAppExeName "Bootstrap.exe"
 #define MyAppId "7A2E4D0F-9B1C-4A3E-8F2D-6C5B4A3E2F10"
 

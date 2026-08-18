@@ -9,29 +9,14 @@ namespace PetApp;
 /// <summary>Compact pomodoro overlay shown near the pet. The timer itself runs
 /// in <see cref="FocusTimerService"/>, so closing this window never stops the
 /// countdown.</summary>
-public sealed class FocusForm : Form
+public sealed class FocusForm : DesktopOverlayForm
 {
     private readonly WebView2 _web = new();
     private readonly Action<string, JsonElement> _messageHandler;
 
-    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
-    private static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref Margins pMarInset);
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct Margins
-    {
-        public int LeftWidth, RightWidth, TopHeight, BottomHeight;
-    }
-
-    public FocusForm(Action<string, JsonElement> messageHandler)
+    public FocusForm(Action<string, JsonElement> messageHandler) : base(new Size(300, 308))
     {
         _messageHandler = messageHandler;
-        FormBorderStyle = FormBorderStyle.None;
-        TopMost = true;
-        ShowInTaskbar = false;
-        StartPosition = FormStartPosition.Manual;
-        Size = new Size(300, 308);
-        BackColor = Color.Black;
 
         _web.Dock = DockStyle.Fill;
         _web.DefaultBackgroundColor = Color.Transparent;
@@ -42,8 +27,6 @@ public sealed class FocusForm : Form
 
     private async void OnLoad(object? sender, EventArgs e)
     {
-        var margins = new Margins { LeftWidth = -1, RightWidth = -1, TopHeight = -1, BottomHeight = -1 };
-        DwmExtendFrameIntoClientArea(Handle, ref margins);
 
         var userData = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

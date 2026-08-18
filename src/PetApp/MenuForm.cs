@@ -8,29 +8,14 @@ namespace PetApp;
 
 /// <summary>Standalone context-menu window (HTML styled) shown above the pet.
 /// Lives outside the pet window so it is never clipped by the model bounds.</summary>
-public sealed class MenuForm : Form
+public sealed class MenuForm : DesktopOverlayForm
 {
     private readonly WebView2 _web = new();
     private readonly Action<string, JsonElement> _messageHandler;
 
-    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
-    private static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref Margins pMarInset);
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct Margins
-    {
-        public int LeftWidth, RightWidth, TopHeight, BottomHeight;
-    }
-
-    public MenuForm(Action<string, JsonElement> messageHandler)
+    public MenuForm(Action<string, JsonElement> messageHandler) : base(new Size(200, 160))
     {
         _messageHandler = messageHandler;
-        FormBorderStyle = FormBorderStyle.None;
-        TopMost = true;
-        ShowInTaskbar = false;
-        StartPosition = FormStartPosition.Manual;
-        Size = new Size(200, 160);
-        BackColor = Color.Black;
 
         _web.Dock = DockStyle.Fill;
         _web.DefaultBackgroundColor = Color.Transparent;
@@ -42,8 +27,6 @@ public sealed class MenuForm : Form
 
     private async void OnLoad(object? sender, EventArgs e)
     {
-        var margins = new Margins { LeftWidth = -1, RightWidth = -1, TopHeight = -1, BottomHeight = -1 };
-        DwmExtendFrameIntoClientArea(Handle, ref margins);
 
         var userData = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

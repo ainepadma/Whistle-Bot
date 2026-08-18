@@ -14,6 +14,8 @@ internal static class Program
         Run("开始后按墙钟时间递减", TestCountdownByWallClock);
         Run("暂停/恢复保留剩余时间", TestPauseResumeKeepsRemaining);
         Run("跳过完成当前阶段并进入休息", TestSkipAdvancesToBreak);
+        Run("关联跨轮保留且跳过记录真实时长", TestAssociationAndPartialDuration);
+        Run("自然完成记录完整时长", TestAssociatedNaturalCompletion);
         Run("重置只重置当前阶段时长", TestResetKeepsPhase);
         Run("第四轮进入长休息并重置周期", TestLongBreakCycle);
         Run("切换预设仅允许未运行且清空周期", TestPresetSwitchRules);
@@ -113,6 +115,42 @@ internal static class Program
         Assert(next.RemainingSeconds == 1500, "next focus shows full duration");
         Assert(done != null && done.CompletedPhase == "short-break" && done.NextPhase == "focus",
             "break finished event points to focus");
+        svc.Dispose();
+    }
+
+    private static void TestAssociationAndPartialDuration()
+    {
+        var (svc, clock, _) = NewService();
+        FocusFinishedEventArgs? done = null;
+        svc.PhaseFinished += (_, e) => done = e;
+        svc.StartForEvent("event-1");
+        clock.Now = clock.Now.AddSeconds(37);
+        svc.Refresh();
+        svc.Skip();
+        Assert(done != null && done.EventId == "event-1", "linked event id is emitted");
+        Assert(done!.PlannedSeconds == 1500 && done.ActualSeconds == 37 && done.Skipped,
+            "skip records elapsed time instead of the full plan");
+        Assert(svc.GetState().ActiveEventId == "event-1", "association survives into the break");
+        svc.Skip();
+        Assert(svc.GetState().Mode == "focus" && svc.GetState().ActiveEventId == "event-1",
+            "association survives into the next focus round");
+        svc.DetachEvent();
+        Assert(svc.GetState().ActiveEventId == null, "explicit detach ends the association");
+        svc.Dispose();
+    }
+
+    private static void TestAssociatedNaturalCompletion()
+    {
+        var (svc, clock, _) = NewService();
+        FocusFinishedEventArgs? done = null;
+        svc.PhaseFinished += (_, e) => done = e;
+        svc.StartForEvent("event-2");
+        clock.Now = clock.Now.AddSeconds(1500);
+        svc.Refresh();
+        Assert(done != null && done.EventId == "event-2" && done.ActualSeconds == 1500,
+            "natural completion records the full duration");
+        Assert(!done!.Skipped && svc.GetState().ActiveEventId == "event-2",
+            "natural completion remains linked for the next round");
         svc.Dispose();
     }
 
@@ -252,7 +290,7 @@ internal static class Program
         var path = Path.Combine(dir, "focus.json");
         // Running focus whose end time passed while the app was closed.
         File.WriteAllText(path, """
-            {"Version":1,"PresetId":"25-5","Mode":"focus","Status":"running","CycleIndex":1,"TotalSeconds":1500,"RemainingSeconds":1500,"EndTimeUtc":"2026-01-01T00:00:00Z"}
+            {"Version":1,"PresetId":"25-5","Mode":"focus","Status":"running","CycleIndex":1,"TotalSeconds":1500,"RemainingSeconds":1500,"EndTimeUtc":"2026-01-01T00:00:00Z","ActiveEventId":"event-recovery"}
             """);
         var clock = new ManualClock();
         var svc = new FocusTimerService(path, () => clock.Now);
@@ -262,8 +300,9 @@ internal static class Program
         var s = svc.GetState();
         Assert(s.Mode == "short-break" && s.Status == "paused", "expired focus recovers into paused break");
         Assert(s.TotalSeconds == 300 && s.RemainingSeconds == 300, "break duration restored");
-        Assert(done != null && done.Recovered && done.CompletedPhase == "focus",
-            "recovery notification raised once");
+        Assert(done != null && done.Recovered && done.CompletedPhase == "focus"
+            && done.EventId == "event-recovery" && done.ActualSeconds == 1500,
+            "recovery records the linked completed focus once");
         svc.Dispose();
 
         // Expired long break while closed → back to idle and round reset.

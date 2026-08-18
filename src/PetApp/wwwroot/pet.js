@@ -131,13 +131,20 @@
   }
   function post(msg) { if (window.chrome && chrome.webview) chrome.webview.postMessage(msg); }
 
+  let requestedPetContainerSize = 200;
   function applyModelSize(size) {
-    // All presets keep their container (window) size but render the model
-    // 50px smaller inside it: 小 150/200, 中 200/250, 大 250/300.
-    let model = (size || 280) - 50;
-    if (model < 120) model = 120;
-    document.documentElement.style.setProperty('--pet-size', model + 'px');
+    requestedPetContainerSize = size || requestedPetContainerSize;
+    // Fit against the real WebView viewport, not just the selected width.
+    // Stage padding reserves 54px above for notes and 18px below for shadow
+    // and animation movement.
+    // Window presets 200/250/300 map to model sizes 100/150/200.
+    const requested = Math.max(100, Math.min(200, requestedPetContainerSize - 100));
+    const availableWidth = Math.max(100, stage.clientWidth - 24);
+    const availableHeight = Math.max(100, stage.clientHeight - 72);
+    const model = Math.max(100, Math.min(requested, availableWidth, availableHeight));
+    document.documentElement.style.setProperty('--pet-size', Math.floor(model) + 'px');
   }
+  window.addEventListener('resize', () => applyModelSize(requestedPetContainerSize));
   function applyColor(color) {
     if (color) document.documentElement.style.setProperty('--pet-color', color);
   }

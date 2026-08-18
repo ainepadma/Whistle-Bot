@@ -7,9 +7,14 @@ $pkg = Join-Path $dist 'DesktopPet-win-x64'
 
 Remove-Item $petOut, $bootOut, $pkg -Recurse -Force -ErrorAction SilentlyContinue
 
+Write-Host '== Building schedule WebView UI =='
+npm --prefix (Join-Path $root 'src\Motodo.Web') run build
+if ($LASTEXITCODE -ne 0) { throw 'Schedule web build failed' }
+
 Write-Host '== Publishing PetApp (.NET 9 framework-dependent single-file) =='
 dotnet publish (Join-Path $root 'src\PetApp') -c Release -r win-x64 --self-contained false -o $petOut
 if ($LASTEXITCODE -ne 0) { throw 'PetApp publish failed' }
+Copy-Item (Join-Path $root 'src\Motodo.Web\resources\icon.ico') (Join-Path $petOut 'schedule.ico') -Force
 
 Write-Host '== Building Bootstrap (.NET Framework 4.8, preinstalled on Windows) =='
 dotnet build (Join-Path $root 'src\Bootstrap') -c Release -o $bootOut
@@ -20,6 +25,9 @@ Copy-Item (Join-Path $petOut '*') $pkg -Recurse -Force
 Copy-Item (Join-Path $bootOut 'Bootstrap.exe') $pkg -Force
 # drop intellisense docs / debug symbols to keep the package tiny
 Get-ChildItem $pkg -Recurse -Include *.xml, *.pdb | Remove-Item -Force
+
+$manifest = Join-Path $root 'version.yml'
+Copy-Item $manifest (Join-Path $dist 'version.yml') -Force
 
 $zip = Join-Path $dist 'DesktopPet-win-x64.zip'
 Remove-Item $zip -Force -ErrorAction SilentlyContinue

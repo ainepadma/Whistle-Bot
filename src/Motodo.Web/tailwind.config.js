@@ -1,0 +1,6 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ['./src/renderer/**/*.{ts,tsx,html}'],
+  theme: { extend: { colors: { primary: { 50: '#eff6ff', 100: '#dbeafe', 300: '#93c5fd', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a', 950: '#172554' } } } },
+  plugins: []
+}
