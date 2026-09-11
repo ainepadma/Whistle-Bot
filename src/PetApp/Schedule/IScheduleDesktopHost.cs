@@ -20,6 +20,7 @@ internal interface IScheduleDesktopHost
     bool IsAutostartEnabled();
     void SetAutostartEnabled(bool enabled);
     string GetPetColor();
+    void ShowGuide();
 
     FocusState GetFocusState();
     void ToggleFocus();

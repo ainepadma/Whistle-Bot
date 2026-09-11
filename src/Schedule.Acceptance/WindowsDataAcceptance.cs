@@ -125,7 +125,10 @@ internal static class WindowsDataAcceptance
         pass(GuideState.ShouldShow(guideDirectory), "Welcome guide is enabled before its first successful display");
         GuideState.MarkSeen(guideDirectory);
         pass(!GuideState.ShouldShow(guideDirectory) &&
-             File.ReadAllText(Path.Combine(guideDirectory, "welcome-guide.seen")) == "Preview v1.3.0",
+             File.ReadAllText(Path.Combine(guideDirectory, "welcome-guide.seen")) == GuideState.CurrentRevision,
             "Welcome guide marker prevents repeat startup display without changing appearance settings");
+        File.WriteAllText(Path.Combine(guideDirectory, "welcome-guide.seen"), "Preview v1.3.0");
+        pass(GuideState.ShouldShow(guideDirectory),
+            "Updated welcome guide is shown once to users of the earlier preview build");
     }
 }

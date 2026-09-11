@@ -93,6 +93,7 @@ internal sealed class ScheduleRpcBridge
             "system:is-auto-start" => _desktop.IsAutostartEnabled(),
             "system:set-auto-start" => SetAutostart(args[0].GetBoolean()),
             "system:pet-color" => _desktop.GetPetColor(),
+            "system:open-guide" => OpenGuide(),
             "system:open-external" => OpenExternal(args[0].GetString()),
 
             "window:minimize" => Minimize(),
@@ -169,6 +170,7 @@ internal sealed class ScheduleRpcBridge
     private object? DismissReminder(string id) { _store.DismissReminder(id); return null; }
     private object? SnoozeReminder(string id, int minutes) { _store.SnoozeReminder(id, minutes); return null; }
     private object? SetAutostart(bool enabled) { _desktop.SetAutostartEnabled(enabled); return null; }
+    private object? OpenGuide() { _desktop.ShowGuide(); return null; }
     private object? Minimize() { _host.WindowState = FormWindowState.Minimized; return null; }
     private object? ToggleMaximize()
     {

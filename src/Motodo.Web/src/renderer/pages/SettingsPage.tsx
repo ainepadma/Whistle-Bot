@@ -157,8 +157,15 @@ useEffect(() => {
                 <section className="ui-card p-5">
                     <h3 className="ui-section-title mb-2">桌宠服务</h3>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        日程、提醒和专注计时由小鹞 WhistleBot 统一管理。可通过桌宠右键菜单“设置 → 检查更新”查看新版。
+                        日程、提醒和专注计时由小鹞 WhistleBot 统一管理。使用教学可随时重新打开。
                     </p>
+                    <button
+                        type="button"
+                        onClick={() => void window.electronAPI.system.openGuide()}
+                        className="mt-3 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                    >
+                        打开使用教学
+                    </button>
                 </section>
 
                 {/* 关于 */}

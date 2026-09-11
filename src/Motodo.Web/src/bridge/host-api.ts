@@ -89,6 +89,7 @@ window.electronAPI = {
         getAppVersion: () => invoke('system:app-version'), getPlatform: () => invoke('system:platform'),
         setAutoStart: (enabled: boolean) => invoke('system:set-auto-start', enabled), isAutoStartEnabled: () => invoke('system:is-auto-start',),
         getPetColor: () => invoke('system:pet-color'),
+        openGuide: () => invoke('system:open-guide'),
         openExternal: (url: string) => invoke('system:open-external', url)
     },
     window: {

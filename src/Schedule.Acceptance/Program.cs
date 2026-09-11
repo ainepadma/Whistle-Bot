@@ -133,8 +133,8 @@ internal static class Program
 
         var store = new CardLayoutStore(path);
         var action = store.Get("next");
-        Pass(action.Width == 400 && action.Height == 480 && action.Pinned && action.Visible && action.X == 120 && action.Y == 80,
-            "Card layout v3 -> v7 action-card migration preserves placement and pinning");
+        Pass(action.Width == 400 && action.Height == 300 && action.Pinned && action.Visible && action.X == 120 && action.Y == 80,
+            "Card layout v3 -> v8 action-card migration preserves placement and pinning");
         var calendar = store.Get("calendar");
         Pass(calendar.Width == 960 && calendar.Height == 680,
             "Calendar card default layout");
@@ -156,8 +156,20 @@ internal static class Program
         var reopened = new CardLayoutStore(legacyPath);
         Pass(reopened.Get("today").X == -1600 && reopened.Get("today").Y == 120 &&
              reopened.Get("today").Pinned && reopened.Get("today").Visible && reopened.Get("next").AlwaysOnTop &&
-             reopened.Get("next").Height == 480,
+             reopened.Get("next").Height == 300,
             "Tier migration survives restart without losing positions or presentation settings");
+
+        var v7Path = Path.Combine(_temporaryRoot, "cards-v7.json");
+        File.WriteAllText(v7Path, """
+            {"Version":7,"Cards":{
+              "today":{"Kind":"today","Width":400,"Height":480,"X":120,"Y":90,"Pinned":true,"Visible":true},
+              "next":{"Kind":"next","Width":400,"Height":480,"X":640,"Y":90,"AlwaysOnTop":true}}}
+            """);
+        var compact = new CardLayoutStore(v7Path);
+        Pass(compact.Get("today").Width == 400 && compact.Get("today").Height == 300 &&
+             compact.Get("next").Width == 400 && compact.Get("next").Height == 300 &&
+             compact.Get("today").X == 120 && compact.Get("today").Pinned && compact.Get("next").AlwaysOnTop,
+            "Existing v7 compact cards remove unused height while preserving placement and presentation");
     }
 
     private static string RequiredId(IReadOnlyDictionary<string, object?> item) =>

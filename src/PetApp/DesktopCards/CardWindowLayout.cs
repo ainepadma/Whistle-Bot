@@ -6,7 +6,7 @@ internal static class CardWindowLayout
     // CSS pixels: one size per role, independent of content and display scaling.
     public static Size PreferredSize(string kind) => kind is "calendar" or "manage"
         ? new Size(960, 680)
-        : new Size(400, 480);
+        : new Size(400, 300);
 
     public static Rectangle Fit(Size preferred, Point? location, Rectangle workArea, int dpi)
     {

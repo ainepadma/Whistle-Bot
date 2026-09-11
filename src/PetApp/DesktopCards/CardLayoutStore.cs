@@ -55,42 +55,48 @@ internal sealed class CardLayoutStore
                 _document.Version = 5;
             }
 
-            if (_document.Version >= 7) return;
-
-            // Fold legacy single-purpose cards into one action card. Prefer the
-            // focused task card's placement so currently pinned workflows stay put.
-            if (!_document.Cards.ContainsKey("next"))
+            if (_document.Version < 7)
             {
-                var source = new[] { "focus", "todo", "upcoming" }
-                    .Select(kind => _document.Cards.TryGetValue(kind, out var layout) ? layout : null)
-                    .FirstOrDefault(layout => layout is not null);
-                if (source is not null)
+                // Fold legacy single-purpose cards into one action card. Prefer the
+                // focused task card's placement so currently pinned workflows stay put.
+                if (!_document.Cards.ContainsKey("next"))
                 {
-                    _document.Cards["next"] = new CardLayout
+                    var source = new[] { "focus", "todo", "upcoming" }
+                        .Select(kind => _document.Cards.TryGetValue(kind, out var layout) ? layout : null)
+                        .FirstOrDefault(layout => layout is not null);
+                    if (source is not null)
                     {
-                        Kind = "next", X = source.X, Y = source.Y, Width = 390, Height = 420,
-                        Visible = source.Visible, Pinned = source.Pinned, AlwaysOnTop = source.AlwaysOnTop
+                        _document.Cards["next"] = new CardLayout
+                        {
+                            Kind = "next", X = source.X, Y = source.Y, Width = 390, Height = 420,
+                            Visible = source.Visible, Pinned = source.Pinned, AlwaysOnTop = source.AlwaysOnTop
+                        };
+                    }
+                }
+
+                if (!_document.Cards.ContainsKey("today") && _document.Cards.TryGetValue("quick", out var quick))
+                {
+                    _document.Cards["today"] = new CardLayout
+                    {
+                        Kind = "today", X = quick.X, Y = quick.Y, Width = 352, Height = 320,
+                        Visible = quick.Visible, Pinned = quick.Pinned, AlwaysOnTop = quick.AlwaysOnTop
                     };
                 }
+
+                foreach (var legacy in new[] { "focus", "todo", "upcoming", "quick" }) _document.Cards.Remove(legacy);
+                _document.Version = 7;
             }
 
-            if (!_document.Cards.ContainsKey("today") && _document.Cards.TryGetValue("quick", out var quick))
+            if (_document.Version < 8)
             {
-                _document.Cards["today"] = new CardLayout
+                foreach (var kind in new[] { "today", "next", "calendar", "manage" })
                 {
-                    Kind = "today", X = quick.X, Y = quick.Y, Width = 352, Height = 320,
-                    Visible = quick.Visible, Pinned = quick.Pinned, AlwaysOnTop = quick.AlwaysOnTop
-                };
+                    var size = CardWindowLayout.PreferredSize(kind);
+                    ResizeLegacyCard(kind, size.Width, size.Height);
+                }
+                _document.Version = 8;
+                SaveLocked();
             }
-
-            foreach (var legacy in new[] { "focus", "todo", "upcoming", "quick" }) _document.Cards.Remove(legacy);
-            foreach (var kind in new[] { "today", "next", "calendar", "manage" })
-            {
-                var size = CardWindowLayout.PreferredSize(kind);
-                ResizeLegacyCard(kind, size.Width, size.Height);
-            }
-            _document.Version = 7;
-            SaveLocked();
         }
     }
 
@@ -136,7 +142,7 @@ internal sealed class CardLayoutStore
 
 internal sealed class CardLayoutDocument
 {
-    public int Version { get; set; } = 7;
+    public int Version { get; set; } = 8;
     public Dictionary<string, CardLayout> Cards { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -146,7 +152,7 @@ internal sealed class CardLayout
     public int X { get; set; } = int.MinValue;
     public int Y { get; set; } = int.MinValue;
     public int Width { get; set; } = 400;
-    public int Height { get; set; } = 480;
+    public int Height { get; set; } = 300;
     public bool Visible { get; set; }
     public bool Pinned { get; set; }
     public bool AlwaysOnTop { get; set; }

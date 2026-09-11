@@ -7,6 +7,9 @@ const html = fs.readFileSync(path.join(root, 'guide.html'), 'utf8')
 const script = fs.readFileSync(path.join(root, 'guide.js'), 'utf8')
 const menu = fs.readFileSync(path.join(root, 'menu.html'), 'utf8')
 const menuScript = fs.readFileSync(path.join(root, 'menu.js'), 'utf8')
+const settingsPage = fs.readFileSync(path.join(__dirname, '../Motodo.Web/src/renderer/pages/SettingsPage.tsx'), 'utf8')
+const hostApi = fs.readFileSync(path.join(__dirname, '../Motodo.Web/src/bridge/host-api.ts'), 'utf8')
+const nativeBridge = fs.readFileSync(path.join(__dirname, '../PetApp/Schedule/ScheduleRpcBridge.cs'), 'utf8')
 
 assert.equal((html.match(/class="page(?: on)?"/g) || []).length, 4, 'guide contains four focused pages')
 for (const text of ['拖动', '单击', '双击', '行动', '今天', '日历', '管理', '专注', '样式', '使用说明', '通知区域'])
@@ -16,6 +19,10 @@ assert.ok(script.includes("post({type:'guide-ready'})"), 'guide reports successf
 assert.ok(script.includes("type:'guide-close'"), 'guide can close from the title bar and final page')
 assert.ok(script.includes("event.key==='Escape'") && script.includes("event.key==='ArrowLeft'") && script.includes("event.key==='ArrowRight'"),
   'guide supports keyboard close and page navigation')
-assert.ok(menu.includes('data-action="guide">使用说明</button>'), 'settings menu exposes the guide')
+assert.ok(menu.includes('data-action="guide">使用教学</button>'), 'pet settings menu exposes the guide')
 assert.ok(menuScript.includes("post({ type: 'guide' })"), 'settings menu forwards the guide action to the host')
-console.log('Guide acceptance: 16 passed, 0 failed')
+assert.ok(settingsPage.includes('打开使用教学') && settingsPage.includes('electronAPI.system.openGuide()'),
+  'schedule settings exposes a visible guide button')
+assert.ok(hostApi.includes("openGuide: () => invoke('system:open-guide')"), 'web bridge forwards the guide request')
+assert.ok(nativeBridge.includes('"system:open-guide" => OpenGuide()'), 'native bridge opens the guide window')
+console.log('Guide acceptance: 19 passed, 0 failed')

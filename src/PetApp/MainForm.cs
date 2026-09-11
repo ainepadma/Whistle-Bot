@@ -620,6 +620,7 @@ public sealed class MainForm : Form, IScheduleDesktopHost
     bool IScheduleDesktopHost.IsAutostartEnabled() => IsAutostartEnabled();
     void IScheduleDesktopHost.SetAutostartEnabled(bool enabled) => SetAutostart(enabled);
     string IScheduleDesktopHost.GetPetColor() => _petColor;
+    void IScheduleDesktopHost.ShowGuide() => ShowGuide(firstRun: false);
     FocusState IScheduleDesktopHost.GetFocusState() => _focusTimer?.GetState() ?? new FocusState();
     void IScheduleDesktopHost.ToggleFocus() => _focusTimer?.Toggle();
     void IScheduleDesktopHost.ResetFocus() => _focusTimer?.Reset();
