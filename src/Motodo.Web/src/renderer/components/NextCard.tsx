@@ -11,8 +11,10 @@ export default function NextCard(): JSX.Element {
     const [todos, setTodos] = useState<Event[]>([])
     const [upcoming, setUpcoming] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
-    const [todosExpanded, setTodosExpanded] = useState(false)
-    const [upcomingExpanded, setUpcomingExpanded] = useState(false)
+    const [todosOpen, setTodosOpen] = useState<boolean | null>(null)
+    const [upcomingOpen, setUpcomingOpen] = useState<boolean | null>(null)
+    const todosExpanded = todosOpen ?? todos.length > 0
+    const upcomingExpanded = upcomingOpen ?? upcoming.length > 0
     const openCreate = useEventUiStore((state) => state.openCreate)
     const openDetail = useEventUiStore((state) => state.openDetail)
 
@@ -32,11 +34,10 @@ export default function NextCard(): JSX.Element {
                     window.electronAPI.event.query({ start: now.toISOString(), end: now.add(12, 'hour').toISOString() }) as Promise<Event[]>
                 ])
                 if (!mounted || request !== revision) return
-                setTodos(allTodos.sort((a, b) => a.start_at.localeCompare(b.start_at)).slice(0, 3))
+                setTodos(allTodos.sort((a, b) => a.start_at.localeCompare(b.start_at)))
                 setUpcoming(planned
                     .filter((event) => event.item_type !== 'todo' && !event.is_completed)
-                    .sort((a, b) => a.start_at.localeCompare(b.start_at))
-                    .slice(0, 2))
+                    .sort((a, b) => a.start_at.localeCompare(b.start_at)))
             } catch {
                 // Keep the last result during transient host failures; the next refresh retries.
             } finally {
@@ -60,7 +61,7 @@ export default function NextCard(): JSX.Element {
     }
 
     return (
-        <section className="desktop-card-panel ui-card overflow-y-auto">
+        <section className="desktop-card-panel action-content">
             <FocusCard cardKind="next" autoResize={false} onOpenEvent={(eventId) => void openFocusedEvent(eventId)} />
 
             <div className="mt-1 border-t border-zinc-100 pt-2 dark:border-zinc-800">
@@ -69,7 +70,7 @@ export default function NextCard(): JSX.Element {
                         type="button"
                         aria-expanded={todosExpanded}
                         aria-controls="action-pending-items"
-                        onClick={() => setTodosExpanded((expanded) => !expanded)}
+                        onClick={() => setTodosOpen(!todosExpanded)}
                         className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     >
                         <Icon name={todosExpanded ? 'chevron-up' : 'chevron-down'} className="h-3 w-3" />
@@ -98,7 +99,7 @@ export default function NextCard(): JSX.Element {
                         type="button"
                         aria-expanded={upcomingExpanded}
                         aria-controls="action-upcoming-items"
-                        onClick={() => setUpcomingExpanded((expanded) => !expanded)}
+                        onClick={() => setUpcomingOpen(!upcomingExpanded)}
                         className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     >
                         <Icon name={upcomingExpanded ? 'chevron-up' : 'chevron-down'} className="h-3 w-3" />

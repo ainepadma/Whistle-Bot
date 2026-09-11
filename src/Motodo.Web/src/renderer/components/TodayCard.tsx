@@ -87,7 +87,7 @@ export default function TodayCard({ onCreate }: TodayCardProps): JSX.Element {
 
     return (
         <div
-            className="desktop-card-panel ui-card flex flex-col overflow-hidden"
+            className="desktop-card-panel today-content"
         >
             <div className="mb-3 flex shrink-0 items-center justify-between">
                 <span className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
@@ -98,7 +98,7 @@ export default function TodayCard({ onCreate }: TodayCardProps): JSX.Element {
 
             {error && <p role="alert" className="mb-2 text-xs text-red-500">加载失败：{error}</p>}
             {/* 今日日程 */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div>
             {loading ? (
                 <div className="flex h-28 items-center justify-center">
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-950
@@ -123,7 +123,7 @@ export default function TodayCard({ onCreate }: TodayCardProps): JSX.Element {
                         />
                     ))}
                     {total === 0 && (
-                        <div className="rounded-lg border border-dashed border-zinc-200 py-6 text-center
+                        <div className="today-empty py-6 text-center
                             text-xs text-zinc-400 dark:border-zinc-800">
                             今天暂无日程
                         </div>
@@ -132,7 +132,7 @@ export default function TodayCard({ onCreate }: TodayCardProps): JSX.Element {
             )}
 
             </div>
-            {/* 日程列表单独滚动，统计与新建按钮始终可见。 */}
+            {/* Content grows the native window; the outer host pages only at the screen limit. */}
             <div className="mt-3 flex shrink-0 items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
                 <p className="text-[10px] text-zinc-400">
                     {total} 项 · 待办 {completedTodos}/{todos.length}

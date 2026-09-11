@@ -16,6 +16,9 @@ internal interface IScheduleDesktopHost
     void ToggleCardPinned(string kind);
     void MoveCard(string kind, int deltaX, int deltaY);
     void ResizeCard(string kind, int width, int height);
+    void FitCardContent(string kind, int height);
+    void BeginCardResize(string kind, string direction);
+    void ResetCardSize(string kind);
 
     bool IsAutostartEnabled();
     void SetAutostartEnabled(bool enabled);

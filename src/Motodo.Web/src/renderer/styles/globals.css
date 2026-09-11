@@ -127,19 +127,23 @@ body.card-mode-body {
     background: transparent !important;
 }
 
-/* Card typography and chrome stay identical across both native size tiers. */
+/* One native surface; no inset card frame or gutter around the content. */
 html.card-mode {
     font-size: 14px;
 }
 
 .desktop-card-compact {
-    padding: 12px;
+    padding: 0;
 }
 
 .desktop-card-panel {
-    height: 100%;
+    height: auto;
     min-height: 0;
-    padding: 12px;
+    padding: 16px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
 }
 
 .desktop-card-toolbar button {
@@ -152,19 +156,56 @@ html.card-mode {
 }
 
 .desktop-card-shell * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .desktop-card-shell ::-webkit-scrollbar {
-    display: block;
-    width: 6px;
-    height: 6px;
+    display: none;
+    width: 0;
+    height: 0;
 }
 
-.desktop-card-shell ::-webkit-scrollbar-thumb {
-    border-radius: 8px;
-    background: hsl(var(--border));
+.card-content-frame {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.card-content-viewport {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.card-natural-content { display: flow-root; }
+.card-content-pages {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: space-between;
+    padding: 5px 16px;
+    border-top: 1px solid hsl(var(--border));
+    font-size: 11px;
+}
+.card-content-pages button { padding: 3px 6px; }
+.card-content-pages button:disabled { opacity: .35; }
+.today-empty { min-height: 174px; display: grid; place-content: center; }
+.action-content > section > .relative.mt-2 > .font-mono { font-size: 40px; line-height: 1.1; }
+
+.card-resize-edge { position: absolute; z-index: 100; touch-action: none; }
+.card-resize-n, .card-resize-s { left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+.card-resize-n { top: 0; } .card-resize-s { bottom: 0; }
+.card-resize-e, .card-resize-w { top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+.card-resize-e { right: 0; } .card-resize-w { left: 0; }
+.card-resize-ne, .card-resize-se, .card-resize-sw, .card-resize-nw { width: 10px; height: 10px; }
+.card-resize-ne { top: 0; right: 0; cursor: nesw-resize; }
+.card-resize-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.card-resize-nw { top: 0; left: 0; cursor: nwse-resize; }
+.card-resize-se { bottom: 0; right: 0; cursor: nwse-resize; }
+.card-resize-se::after {
+    content: ''; position: absolute; right: 3px; bottom: 3px; width: 5px; height: 5px;
+    border-right: 1px solid #94a3b8; border-bottom: 1px solid #94a3b8;
 }
 
 .desktop-card-shell .ui-page-header {
@@ -174,7 +215,12 @@ html.card-mode {
 
 .desktop-card-shell .ui-page-content {
     overscroll-behavior: contain;
+    background: transparent;
 }
+
+.management-content .ui-card { border: 0; border-radius: 0; box-shadow: none; padding: 12px 0; }
+.management-content .ui-card + .ui-card { border-top: 1px solid hsl(var(--border)); }
+.desktop-card-shell .ui-page-header { background: transparent; box-shadow: none; backdrop-filter: none; }
 
 button,
 input,

@@ -3,10 +3,44 @@ namespace PetApp.DesktopCards;
 /// <summary>Fits a preferred CSS size without replacing it with a temporary monitor limit.</summary>
 internal static class CardWindowLayout
 {
-    // CSS pixels: one size per role, independent of content and display scaling.
-    public static Size PreferredSize(string kind) => kind is "calendar" or "manage"
-        ? new Size(960, 680)
-        : new Size(400, 300);
+    // CSS pixels. Compact cards start square; content growth never overwrites this baseline.
+    public static Size PreferredSize(string kind) => kind switch
+    {
+        "calendar" => new Size(940, 660),
+        "manage" => new Size(720, 380),
+        _ => new Size(320, 320)
+    };
+
+    public static Size MinimumSize(string kind) => kind switch
+    {
+        "calendar" => new Size(600, 420),
+        "manage" => new Size(480, 320),
+        _ => new Size(300, 260)
+    };
+
+    public static bool IsValidRequest(int width, int height) =>
+        width is > 0 and <= 32768 && height is > 0 and <= 32768;
+
+    public static Size ClampPreference(string kind, Size preferred)
+    {
+        var minimum = MinimumSize(kind);
+        return new Size(Math.Clamp(preferred.Width, minimum.Width, 32768),
+            Math.Clamp(preferred.Height, minimum.Height, 32768));
+    }
+
+    public static Size EffectiveSize(CardLayout layout, int contentHeight)
+    {
+        var baseline = ClampPreference(layout.Kind, new Size(layout.Width, layout.Height));
+        return layout.ManualSize ? baseline : new Size(baseline.Width,
+            Math.Max(baseline.Height, Math.Clamp(contentHeight, 0, 32768)));
+    }
+
+    public static int ResizeHitTest(string? direction) => direction switch
+    {
+        "w" => 10, "e" => 11, "n" => 12, "nw" => 13,
+        "ne" => 14, "s" => 15, "sw" => 16, "se" => 17,
+        _ => 0
+    };
 
     public static Rectangle Fit(Size preferred, Point? location, Rectangle workArea, int dpi)
     {

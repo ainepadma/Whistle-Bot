@@ -114,6 +114,9 @@ internal sealed class ScheduleRpcBridge
             "card:toggle-pinned" => ToggleCardPinned(CardKind(args)),
             "card:drag" => MoveCard(CardKind(args), args[1].GetInt32(), args[2].GetInt32()),
             "card:resize" => ResizeCard(CardKind(args), args[1].GetInt32(), args[2].GetInt32()),
+            "card:fit-content" => FitCardContent(CardKind(args), args[1].GetInt32()),
+            "card:begin-resize" => BeginCardResize(CardKind(args), args[1].GetString() ?? ""),
+            "card:reset-size" => ResetCardSize(CardKind(args)),
             "card:close" => CloseCard(CardKind(args)),
 
             "focus:state" => FocusSnapshot(),
@@ -191,6 +194,9 @@ internal sealed class ScheduleRpcBridge
     private object? ToggleCardPinned(string kind) { _desktop.ToggleCardPinned(kind); return _desktop.GetCardPresentation(kind); }
     private object? MoveCard(string kind, int dx, int dy) { _desktop.MoveCard(kind, dx, dy); return null; }
     private object? ResizeCard(string kind, int width, int height) { _desktop.ResizeCard(kind, width, height); return null; }
+    private object? FitCardContent(string kind, int height) { _desktop.FitCardContent(kind, height); return null; }
+    private object? BeginCardResize(string kind, string direction) { _desktop.BeginCardResize(kind, direction); return null; }
+    private object? ResetCardSize(string kind) { _desktop.ResetCardSize(kind); return null; }
     private object? OpenConsole() { _desktop.ShowPlanner(); return null; }
     private object? OpenEdit(JsonElement item)
     {

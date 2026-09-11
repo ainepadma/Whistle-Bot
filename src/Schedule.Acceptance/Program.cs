@@ -133,10 +133,10 @@ internal static class Program
 
         var store = new CardLayoutStore(path);
         var action = store.Get("next");
-        Pass(action.Width == 400 && action.Height == 300 && action.Pinned && action.Visible && action.X == 120 && action.Y == 80,
-            "Card layout v3 -> v8 action-card migration preserves placement and pinning");
+        Pass(action.Width == 320 && action.Height == 320 && action.Pinned && action.Visible && action.X == 120 && action.Y == 80,
+            "Card layout v3 -> v9 square action-card migration preserves placement and pinning");
         var calendar = store.Get("calendar");
-        Pass(calendar.Width == 960 && calendar.Height == 680,
+        Pass(calendar.Width == 940 && calendar.Height == 660,
             "Calendar card default layout");
 
         var legacyPath = Path.Combine(_temporaryRoot, "cards-v6.json");
@@ -150,14 +150,15 @@ internal static class Program
         var migrated = new CardLayoutStore(legacyPath);
         Pass(migrated.Get("today").Width == migrated.Get("next").Width &&
              migrated.Get("today").Height == migrated.Get("next").Height &&
-             migrated.Get("calendar").Width == migrated.Get("manage").Width &&
-             migrated.Get("calendar").Height == migrated.Get("manage").Height,
-            "Existing v6 layouts migrate to two identical size tiers");
+             migrated.Get("today").Width == 320 && migrated.Get("today").Height == 320 &&
+             migrated.Get("calendar").Width == 940 && migrated.Get("calendar").Height == 660 &&
+             migrated.Get("manage").Width == 720 && migrated.Get("manage").Height == 380,
+            "Existing v6 layouts migrate to square compact cards and separate calendar and management sizes");
         var reopened = new CardLayoutStore(legacyPath);
         Pass(reopened.Get("today").X == -1600 && reopened.Get("today").Y == 120 &&
              reopened.Get("today").Pinned && reopened.Get("today").Visible && reopened.Get("next").AlwaysOnTop &&
-             reopened.Get("next").Height == 300,
-            "Tier migration survives restart without losing positions or presentation settings");
+             reopened.Get("next").Height == 320,
+            "Square-card migration survives restart without losing positions or presentation settings");
 
         var v7Path = Path.Combine(_temporaryRoot, "cards-v7.json");
         File.WriteAllText(v7Path, """
@@ -166,10 +167,37 @@ internal static class Program
               "next":{"Kind":"next","Width":400,"Height":480,"X":640,"Y":90,"AlwaysOnTop":true}}}
             """);
         var compact = new CardLayoutStore(v7Path);
-        Pass(compact.Get("today").Width == 400 && compact.Get("today").Height == 300 &&
-             compact.Get("next").Width == 400 && compact.Get("next").Height == 300 &&
+        Pass(compact.Get("today").Width == 320 && compact.Get("today").Height == 320 &&
+             compact.Get("next").Width == 320 && compact.Get("next").Height == 320 &&
              compact.Get("today").X == 120 && compact.Get("today").Pinned && compact.Get("next").AlwaysOnTop,
-            "Existing v7 compact cards remove unused height while preserving placement and presentation");
+            "Existing v7 compact cards become square while preserving placement and presentation");
+
+        var v8Path = Path.Combine(_temporaryRoot, "cards-v8.json");
+        File.WriteAllText(v8Path, """
+            {"Version":8,"Cards":{
+              "today":{"Kind":"today","Width":400,"Height":300,"X":-1500,"Y":120,"Pinned":true,"Visible":true},
+              "next":{"Kind":"next","Width":400,"Height":300,"X":640,"Y":90,"AlwaysOnTop":true},
+              "calendar":{"Kind":"calendar","Width":960,"Height":680},
+              "manage":{"Kind":"manage","Width":960,"Height":680}}}
+            """);
+        var latest = new CardLayoutStore(v8Path);
+        Pass(latest.Get("today").Width == 320 && latest.Get("today").Height == 320 &&
+             latest.Get("next").Width == 320 && latest.Get("next").Height == 320 &&
+             latest.Get("calendar").Width == 940 && latest.Get("calendar").Height == 660 &&
+             latest.Get("manage").Width == 720 && latest.Get("manage").Height == 380 &&
+             !latest.Get("today").ManualSize && latest.Get("today").X == -1500 &&
+             latest.Get("today").Pinned && latest.Get("today").Visible && latest.Get("next").AlwaysOnTop,
+            "Existing v8 fixed sizes migrate once to v9 defaults with placement and pinning intact");
+
+        var manuallySized = latest.Get("next");
+        manuallySized.Width = 450;
+        manuallySized.Height = 370;
+        manuallySized.ManualSize = true;
+        latest.Save(manuallySized);
+        var remembered = new CardLayoutStore(v8Path).Get("next");
+        Pass(remembered.Width == 450 && remembered.Height == 370 && remembered.ManualSize &&
+             remembered.X == 640 && remembered.Y == 90 && remembered.AlwaysOnTop,
+            "Manual width and height survive v9 reopen without being replaced by default dimensions");
     }
 
     private static string RequiredId(IReadOnlyDictionary<string, object?> item) =>

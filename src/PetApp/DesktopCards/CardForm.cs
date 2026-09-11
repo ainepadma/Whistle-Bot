@@ -1,6 +1,7 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using PetApp.Schedule;
+using System.Runtime.InteropServices;
 
 namespace PetApp.DesktopCards;
 
@@ -15,9 +16,11 @@ internal sealed class CardForm : Form
     private bool _contentReady;
     private bool _requestedVisible;
     private bool _activateOnReveal;
+    private bool _nativeResizing;
 
     public event EventHandler? ContentReady;
     public bool IsContentReady => _contentReady;
+    public bool IsNativeResizing => _nativeResizing;
 
     public CardForm(string kind, ScheduleStore store, IScheduleDesktopHost desktop, CardHostManager manager)
     {
@@ -60,6 +63,74 @@ internal sealed class CardForm : Form
         NativeInput.BeginWindowDrag(this);
         _manager.RecordBounds(this);
     }
+
+    public void BeginNativeResize(string direction)
+    {
+        var hitTest = CardWindowLayout.ResizeHitTest(direction);
+        if (_nativeResizing || IsDisposed || !Visible || hitTest == 0) return;
+        _nativeResizing = true;
+        // Leave the WebView2 message callback before entering Windows' modal sizing
+        // loop, otherwise it blocks further renderer callbacks for the whole drag.
+        BeginInvoke((Action)(() => ResizeWithSystem(hitTest)));
+    }
+
+    private void ResizeWithSystem(int hitTest)
+    {
+        var initialSize = Size;
+        try
+        {
+            if (IsDisposed || !Visible) return;
+            // WebView2 owns the child HWND, so transparent DOM edge grips start the
+            // system sizing loop explicitly instead of relying on parent hit testing.
+            ReleaseCapture();
+            var cursor = Cursor.Position;
+            var coordinates = (cursor.Y << 16) | (cursor.X & 0xffff);
+            SendMessage(Handle, 0x00A1, (IntPtr)hitTest, (IntPtr)coordinates);
+        }
+        finally
+        {
+            _nativeResizing = false;
+        }
+        if (!IsDisposed && Size != initialSize) _manager.RecordManualSize(this);
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        base.WndProc(ref message);
+        if (message.Msg != 0x0024 || message.LParam == IntPtr.Zero) return; // WM_GETMINMAXINFO
+        var screen = Screen.FromRectangle(Bounds);
+        var dpi = DpiLayout.ForScreen(screen, DeviceDpi);
+        var minimum = CardWindowLayout.Fit(CardWindowLayout.MinimumSize(Kind), null, screen.WorkingArea, dpi).Size;
+        var limits = Marshal.PtrToStructure<MinMaxInfo>(message.LParam);
+        limits.MinTrackSize = new NativePoint(minimum.Width, minimum.Height);
+        limits.MaxTrackSize = new NativePoint(Math.Max(1, screen.WorkingArea.Width - 32),
+            Math.Max(1, screen.WorkingArea.Height - 32));
+        Marshal.StructureToPtr(limits, message.LParam, false);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+        public NativePoint(int x, int y) { X = x; Y = y; }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     public void Reveal(bool activate = true)
     {

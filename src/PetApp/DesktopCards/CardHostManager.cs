@@ -13,6 +13,7 @@ internal sealed class CardHostManager : IDisposable
     private readonly CardWindowState _state = new();
     private readonly SynchronizationContext? _uiContext;
     private readonly Dictionary<string, PendingSwitch> _pendingSwitches = new();
+    private readonly Dictionary<string, int> _contentHeights = new(StringComparer.OrdinalIgnoreCase);
     private bool _restoring;
     private bool _applyingBounds;
     private bool _disposed;
@@ -167,24 +168,65 @@ internal sealed class CardHostManager : IDisposable
 
     public void Resize(string kind, int width, int height)
     {
-        kind = Normalize(kind);
+        if (!TryNormalize(kind, out kind) || !CardWindowLayout.IsValidRequest(width, height)) return;
         if (!_forms.TryGetValue(kind, out var form) || !IsVisible(kind)) return;
-
-        // Older WebViews may still request content-driven resizing. Keep the tier stable.
-        var logical = CardWindowLayout.PreferredSize(kind);
+        var logical = CardWindowLayout.ClampPreference(kind, new Size(width, height));
         var layout = _layouts.Get(kind);
-        var unchanged = layout.Width == logical.Width && layout.Height == logical.Height;
         layout.Width = logical.Width;
         layout.Height = logical.Height;
+        layout.ManualSize = true;
         Fit(form, layout, form.Location, Screen.FromRectangle(form.Bounds));
-        if (unchanged && layout.X == form.Left && layout.Y == form.Top) return;
         layout.X = form.Left;
         layout.Y = form.Top;
         _layouts.Save(layout);
     }
+
+    public void BeginResize(string kind, string direction)
+    {
+        if (!TryNormalize(kind, out kind) || CardWindowLayout.ResizeHitTest(direction) == 0) return;
+        if (_forms.TryGetValue(kind, out var form) && IsVisible(kind)) form.BeginNativeResize(direction);
+    }
+
+    public void FitContent(string kind, int height)
+    {
+        if (!TryNormalize(kind, out kind) || height is <= 0 or > 32768) return;
+        if (!_forms.TryGetValue(kind, out var form)) return;
+        if (_contentHeights.TryGetValue(kind, out var previous) && previous == height) return;
+        _contentHeights[kind] = height;
+        if (!IsVisible(kind) || form.IsNativeResizing) return;
+        Fit(form, _layouts.Get(kind), form.Location, Screen.FromRectangle(form.Bounds));
+    }
+
+    public void ResetSize(string kind)
+    {
+        if (!TryNormalize(kind, out kind)) return;
+        var layout = _layouts.Get(kind);
+        var size = CardWindowLayout.PreferredSize(kind);
+        layout.Width = size.Width;
+        layout.Height = size.Height;
+        layout.ManualSize = false;
+        _layouts.Save(layout);
+        if (_forms.TryGetValue(kind, out var form))
+            Fit(form, layout, form.Location, Screen.FromRectangle(form.Bounds));
+    }
+
+    public void RecordManualSize(CardForm form)
+    {
+        if (_restoring || _applyingBounds || !IsVisible(form.Kind)) return;
+        var layout = _layouts.Get(form.Kind);
+        var logical = CardWindowLayout.ClampPreference(form.Kind, DpiLayout.ToLogical(form, form.Size));
+        layout.Width = logical.Width;
+        layout.Height = logical.Height;
+        layout.ManualSize = true;
+        Fit(form, layout, form.Location, Screen.FromRectangle(form.Bounds));
+        layout.X = form.Left;
+        layout.Y = form.Top;
+        _layouts.Save(layout);
+    }
+
     public void RecordBounds(CardForm form)
     {
-        if (_restoring || !IsVisible(form.Kind)) return;
+        if (_restoring || _applyingBounds || !IsVisible(form.Kind)) return;
         var layout = _layouts.Get(form.Kind);
         Fit(form, layout, form.Location, Screen.FromRectangle(form.Bounds));
         layout.X = form.Left;
@@ -221,8 +263,9 @@ internal sealed class CardHostManager : IDisposable
 
     private void Fit(CardForm form, CardLayout layout, Point? location, Screen screen, int? dpi = null)
     {
-        if (_applyingBounds || form.IsDisposed) return;
-        var bounds = CardWindowLayout.Fit(CardWindowLayout.PreferredSize(form.Kind),
+        if (_applyingBounds || form.IsDisposed || form.IsNativeResizing) return;
+        var preferred = CardWindowLayout.EffectiveSize(layout, _contentHeights.GetValueOrDefault(form.Kind));
+        var bounds = CardWindowLayout.Fit(preferred,
             location, screen.WorkingArea, dpi ?? DpiLayout.ForScreen(screen, form.DeviceDpi));
         if (form.Bounds == bounds) return;
         _applyingBounds = true;
@@ -232,6 +275,7 @@ internal sealed class CardHostManager : IDisposable
 
     public void OnDpiChanged(CardForm form, Rectangle suggestedBounds, int dpi)
     {
+        if (form.IsNativeResizing) return;
         Fit(form, _layouts.Get(form.Kind), suggestedBounds.Location, Screen.FromRectangle(suggestedBounds), dpi);
     }
 
@@ -257,6 +301,12 @@ internal sealed class CardHostManager : IDisposable
     }
 
     private void PublishState(string kind) => ScheduleEventHub.Instance.Publish("card:state", Presentation(kind));
+
+    private static bool TryNormalize(string? value, out string kind)
+    {
+        kind = value?.Trim().ToLowerInvariant() ?? "";
+        return kind is "today" or "next" or "calendar" or "manage";
+    }
 
     private static string Normalize(string kind)
     {

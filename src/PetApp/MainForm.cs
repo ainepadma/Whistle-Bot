@@ -634,6 +634,9 @@ public sealed class MainForm : Form, IScheduleDesktopHost
     }
     void IScheduleDesktopHost.DetachFocusEvent() => _focusTimer?.DetachEvent();
     void IScheduleDesktopHost.ResizeCard(string kind, int width, int height) => _cardHost?.Resize(kind, width, height);
+    void IScheduleDesktopHost.FitCardContent(string kind, int height) => _cardHost?.FitContent(kind, height);
+    void IScheduleDesktopHost.BeginCardResize(string kind, string direction) => _cardHost?.BeginResize(kind, direction);
+    void IScheduleDesktopHost.ResetCardSize(string kind) => _cardHost?.ResetSize(kind);
 
     private static int Prop(JsonElement root, string name, int fallback) =>
         root.TryGetProperty(name, out var el) ? el.GetInt32() : fallback;

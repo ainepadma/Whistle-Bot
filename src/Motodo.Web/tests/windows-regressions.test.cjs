@@ -74,6 +74,48 @@ function label(node) {
     return node == null ? '' : String(node)
 }
 
+function cardContentHarness({ naturalHeight = 240, surfaceHeight = 200, viewportHeight = 170 } = {}) {
+    const h = hooks(), frames = new Map(), listeners = new Map(), observed = new Set(), requested = [], scrolls = []
+    let nextFrame = 1, observer, disconnected = false
+    const surface = { height: surfaceHeight, getBoundingClientRect() { return { height: this.height } } }
+    const body = { height: naturalHeight, getBoundingClientRect() { return { height: this.height } } }
+    const view = {
+        clientHeight: viewportHeight, scrollHeight: naturalHeight, scrollTop: 0,
+        getBoundingClientRect() { return { height: this.clientHeight } },
+        addEventListener: (name, callback) => listeners.set(name, callback),
+        removeEventListener: (name, callback) => { if (listeners.get(name) === callback) listeners.delete(name) },
+        scrollBy(options) {
+            scrolls.push({ top: options.top, behavior: options.behavior })
+            this.scrollTop = Math.max(0, Math.min(this.scrollHeight - this.clientHeight, this.scrollTop + options.top))
+            listeners.get('scroll')?.()
+        }
+    }
+    const load = loader({ react: h.react }, {
+        window: { electronAPI: { card: { fitContent: (kind, height) => { requested.push({ kind, height }); return Promise.resolve() } } } },
+        requestAnimationFrame: callback => { const id = nextFrame++; frames.set(id, callback); return id },
+        cancelAnimationFrame: id => frames.delete(id),
+        ResizeObserver: class {
+            constructor(callback) { observer = callback }
+            observe(target) { observed.add(target) }
+            disconnect() { disconnected = true; observed.clear() }
+        }
+    })
+    const Component = load('@/components/CardContent').default
+    const render = () => h.render(Component, { kind: 'next', children: 'Visible card contents' })
+    const initial = render()
+    for (const [className, target] of [['card-content-frame', surface], ['card-content-viewport', view], ['card-natural-content', body]]) {
+        elements(initial, node => node.props?.className === className)[0].ref.current = target
+    }
+    h.effects()
+    return {
+        surface, body, view, requested, scrolls, frames, observed, listeners,
+        resize() { if (!disconnected) observer() },
+        paint() { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback()); const tree = render(); h.effects(); return tree },
+        cleanup: () => h.cleanup(),
+        disconnected: () => disconnected
+    }
+}
+
 test('settings synchronize between existing windows without echo writes or overwriting native auto-start', () => {
     const storage = new Map()
     let writes = 0
@@ -196,7 +238,7 @@ test('title-only edits preserve complex recurrence, precise original dates and m
     }
 })
 
-test('action card keeps its native size as content refreshes and disables nested focus resizing', async () => {
+test('action card leaves native sizing to its shared content host and keeps empty sections collapsed', async () => {
     const h = hooks(), requested = []
     const load = loader({
         react: h.react,
@@ -226,6 +268,105 @@ test('action card keeps its native size as content refreshes and disables nested
     assert.equal(elements(tree, node => node.props?.id === 'action-pending-items').length, 1)
     assert.equal(elements(tree, node => node.props?.id === 'action-upcoming-items').length, 0)
     h.cleanup()
+})
+
+test('action card reveals newly loaded pending and upcoming items while respecting explicit collapse across refreshes', async () => {
+    const h = hooks(), subscribers = new Map(), timers = new Map()
+    let todos = [], planned = []
+    const load = loader({
+        react: h.react, '@/components/FocusCard': () => null,
+        '@/stores/event-ui.store': { useEventUiStore: select => select({ openCreate() {}, openDetail() {} }) }
+    }, { window: {
+        electronAPI: {
+            event: { query: async range => range.item_type === 'todo' ? todos : planned },
+            on: (name, callback) => { subscribers.set(name, callback); return () => subscribers.delete(name) }
+        },
+        setInterval: callback => { timers.set(1, callback); return 1 }, clearInterval: id => timers.delete(id)
+    } })
+    const Card = load('@/components/NextCard').default
+    const toggles = tree => elements(tree, node => node.type === 'button' && node.props?.['aria-controls']?.startsWith('action-'))
+    const refresh = async () => { subscribers.get('schedule:changed')(); await flush(); return h.render(Card, {}) }
+    h.render(Card, {}); h.effects(); await flush()
+    let tree = h.render(Card, {})
+    assert.deepEqual(toggles(tree).map(node => node.props['aria-expanded']), [false, false])
+    todos = [{ id: 'todo-1', title: '准备课程笔记', item_type: 'todo', start_at: '2026-09-11T09:00:00Z', is_completed: false }]
+    tree = await refresh()
+    assert.deepEqual(toggles(tree).map(node => node.props['aria-expanded']), [true, false])
+    assert.ok(label(tree).includes('准备课程笔记'))
+    planned = [{ id: 'plan-1', title: '小组讨论', item_type: 'plan', start_at: '2026-09-11T10:00:00Z', is_completed: false }]
+    tree = await refresh()
+    assert.deepEqual(toggles(tree).map(node => node.props['aria-expanded']), [true, true])
+    assert.ok(label(tree).includes('小组讨论'))
+    toggles(tree)[0].props.onClick(); tree = h.render(Card, {})
+    todos = [{ ...todos[0], title: '新的待办事项' }]
+    tree = await refresh()
+    assert.deepEqual(toggles(tree).map(node => node.props['aria-expanded']), [false, true])
+    assert.ok(!label(tree).includes('新的待办事项'))
+    toggles(tree)[1].props.onClick(); tree = h.render(Card, {})
+    todos = []; planned = []; tree = await refresh()
+    todos = [{ id: 'todo-2', title: '稍后整理', item_type: 'todo', start_at: '2026-09-11T11:00:00Z' }]
+    planned = [{ id: 'plan-2', title: '稍后会议', item_type: 'plan', start_at: '2026-09-11T12:00:00Z' }]
+    tree = await refresh()
+    assert.deepEqual(toggles(tree).map(node => node.props['aria-expanded']), [false, false])
+    h.cleanup()
+    assert.equal(subscribers.size, 0); assert.equal(timers.size, 0)
+})
+
+test('card pager disappears when content fits the full frame even while the pager still reduces its viewport', () => {
+    const h = cardContentHarness()
+    let tree = h.paint()
+    assert.equal(elements(tree, node => node.type === 'nav').length, 1)
+    assert.deepEqual(h.requested, [{ kind: 'next', height: 282 }])
+    // The old pager leaves only 170px visible, but releasing it makes the full 200px frame available.
+    h.body.height = h.view.scrollHeight = 190
+    h.resize(); tree = h.paint()
+    assert.equal(elements(tree, node => node.type === 'nav').length, 0)
+    assert.deepEqual(h.requested, [{ kind: 'next', height: 282 }, { kind: 'next', height: 232 }])
+    h.view.clientHeight = 200
+    h.resize(); tree = h.paint()
+    assert.equal(elements(tree, node => node.type === 'nav').length, 0)
+    assert.equal(h.requested.length, 2, 'releasing pager space must not repeat the same native content request')
+    h.cleanup()
+})
+
+test('manual card resizing updates page navigation without echoing unchanged natural height to the native host', () => {
+    const h = cardContentHarness({ naturalHeight: 500, surfaceHeight: 300, viewportHeight: 270 })
+    const buttons = tree => elements(tree, node => node.type === 'button')
+    let tree = h.paint()
+    assert.deepEqual(buttons(tree).map(node => node.props.disabled), [true, false])
+    buttons(tree)[1].props.onClick(); tree = h.paint()
+    assert.deepEqual(h.scrolls.at(-1), { top: 246, behavior: 'auto' })
+    assert.deepEqual(buttons(tree).map(node => node.props.disabled), [false, true])
+    buttons(tree)[0].props.onClick(); tree = h.paint()
+    assert.equal(h.view.scrollTop, 0)
+    assert.deepEqual(buttons(tree).map(node => node.props.disabled), [true, false])
+    h.surface.height = 240; h.view.clientHeight = 210
+    h.resize(); tree = h.paint()
+    buttons(tree)[1].props.onClick(); tree = h.paint()
+    assert.equal(h.scrolls.at(-1).top, 186, 'page steps follow the resized viewport')
+    assert.deepEqual(buttons(tree).map(node => node.props.disabled), [false, false])
+    h.surface.height = h.view.clientHeight = 600; h.view.scrollTop = 0
+    h.resize(); tree = h.paint()
+    assert.equal(elements(tree, node => node.type === 'nav').length, 0)
+    assert.deepEqual(h.requested, [{ kind: 'next', height: 542 }])
+    h.cleanup()
+})
+
+test('card measurement coalesces resize events and cancels pending work and subscriptions on unmount', () => {
+    const h = cardContentHarness()
+    assert.equal(h.observed.size, 3)
+    h.resize(); h.resize(); h.resize()
+    assert.equal(h.frames.size, 1)
+    h.paint(); assert.equal(h.requested.length, 1)
+    h.body.height = 300; h.resize()
+    const abandoned = [...h.frames.values()]
+    h.cleanup()
+    assert.equal(h.frames.size, 0)
+    assert.equal(h.observed.size, 0)
+    assert.equal(h.listeners.size, 0)
+    assert.equal(h.disconnected(), true)
+    abandoned.forEach(callback => callback())
+    assert.equal(h.requested.length, 1, 'an already dispatched callback must not fit an unmounted card')
 })
 
 test('completing or deleting a repeating todo requires an explicit second action', async () => {

@@ -8,6 +8,7 @@ import CardLinks from '@/components/CardLinks'
 import Icon from '@/components/ui/Icons'
 import CalendarCard from '@/components/CalendarCard'
 import ManagementCard from '@/components/ManagementCard'
+import CardContent from '@/components/CardContent'
 
 type CardKind = 'calendar' | 'today' | 'next' | 'manage'
 
@@ -51,11 +52,12 @@ export default function CardApp(): JSX.Element {
     }
 
     return (
-        <div className="desktop-card-shell flex h-full flex-col overflow-hidden rounded-[18px] border border-slate-200/90 bg-slate-50 text-slate-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
+        <div className="desktop-card-shell relative flex h-full flex-col overflow-hidden rounded-[12px] border border-slate-200/90 bg-white text-slate-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
             <div onPointerDown={startDrag}
                 className={`desktop-card-toolbar relative z-10 flex h-[40px] shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-[12px] text-xs select-none dark:border-zinc-800 dark:bg-zinc-950 ${presentation.pinned ? 'cursor-default' : 'cursor-move'}`}>
                 <div className="flex min-w-0 items-center"><CardLinks current={kind} pinned={presentation.pinned} /></div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
+                    <button onClick={() => void window.electronAPI.card.resetSize(kind)} aria-label="恢复自动尺寸" title="恢复自动尺寸" className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 hover:bg-slate-100 dark:hover:bg-zinc-800"><Icon name="restore" className="h-3.5 w-3.5" /></button>
                     <button onClick={() => void window.electronAPI.card.togglePinned(kind)} aria-label={presentation.pinned ? '解除固定' : '固定在桌面'}
                         className={`group relative flex h-7 w-7 items-center justify-center rounded-md transition-colors ${presentation.pinned ? 'bg-primary-100 text-primary-700 dark:bg-primary-950 dark:text-primary-300' : 'text-zinc-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-zinc-800'}`}>
                         <Icon name="pin" className="h-3.5 w-3.5" />
@@ -65,15 +67,24 @@ export default function CardApp(): JSX.Element {
                 </div>
             </div>
 
-            <div className={`min-h-0 flex-1 overflow-hidden ${kind === 'today' || kind === 'next' || view === 'create' ? 'desktop-card-compact' : ''}`}>
+            <div className="min-h-0 flex-1 overflow-hidden">
                 {view === 'create' ? (
-                    <CreateCard key={createKey} onCancel={() => setView('content')} onSaved={() => { setCreateKey((value) => value + 1); setView('content') }} />
-                ) : kind === 'calendar' ? <CalendarCard /> : kind === 'next' ? <NextCard /> : kind === 'manage' ? <ManagementCard /> : (
-                    <TodayCard onCreate={() => setView('create')} />
+                    <CardContent kind={kind}><CreateCard key={createKey} onCancel={() => setView('content')} onSaved={() => { setCreateKey((value) => value + 1); setView('content') }} /></CardContent>
+                ) : kind === 'calendar' ? <CalendarCard /> : kind === 'next' ? <CardContent kind={kind}><NextCard /></CardContent> : kind === 'manage' ? <ManagementCard /> : (
+                    <CardContent kind={kind}><TodayCard onCreate={() => setView('create')} /></CardContent>
                 )}
             </div>
             <SchedulePopups />
             <EventFlow />
+            {['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'].map(direction => (
+                <div key={direction} className={`card-resize-edge card-resize-${direction}`} aria-hidden="true"
+                    onPointerDown={event => {
+                        if (event.button !== 0) return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        void window.electronAPI.card.beginResize(kind, direction)
+                    }} />
+            ))}
         </div>
     )
 }

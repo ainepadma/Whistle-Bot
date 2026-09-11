@@ -107,6 +107,9 @@ window.electronAPI = {
         togglePinned: (kind: string) => invoke('card:toggle-pinned', kind),
         drag: (kind: string, dx: number, dy: number) => invoke('card:drag', kind, dx, dy),
         resize: (kind: string, width: number, height: number) => invoke('card:resize', kind, width, height),
+        fitContent: (kind: string, height: number) => invoke('card:fit-content', kind, height),
+        beginResize: (kind: string, direction: string) => invoke('card:begin-resize', kind, direction),
+        resetSize: (kind: string) => invoke('card:reset-size', kind),
         close: (kind: string) => invoke('card:close', kind)
     },
     focus: {

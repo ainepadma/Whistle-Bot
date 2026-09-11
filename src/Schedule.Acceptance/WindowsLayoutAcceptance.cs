@@ -30,6 +30,41 @@ internal static class WindowsLayoutAcceptance
         var disconnected = CardWindowLayout.Fit(preferred, new Point(2600, 400), primary, 96);
         pass(primary.Contains(disconnected), "Disconnected monitor fallback keeps the complete card reachable");
 
+        pass(CardWindowLayout.PreferredSize("today") == new Size(320, 320) &&
+             CardWindowLayout.PreferredSize("next") == new Size(320, 320) &&
+             CardWindowLayout.PreferredSize("calendar") == new Size(940, 660) &&
+             CardWindowLayout.PreferredSize("manage") == new Size(720, 380),
+            "Compact cards share a square baseline while calendar and management use their own sizes");
+        var automaticCard = new CardLayout { Kind = "next", Width = 320, Height = 320 };
+        var expandedCard = CardWindowLayout.EffectiveSize(automaticCard, 640);
+        pass(expandedCard == new Size(320, 640) && CardWindowLayout.EffectiveSize(automaticCard, 240) == new Size(320, 320) &&
+             automaticCard.Width == 320 && automaticCard.Height == 320 && !automaticCard.ManualSize,
+            "Measured content grows and shrinks card height without changing the saved square baseline");
+        var manualCard = new CardLayout { Kind = "today", Width = 430, Height = 280, ManualSize = true };
+        pass(CardWindowLayout.EffectiveSize(manualCard, 900) == new Size(430, 280) &&
+             CardWindowLayout.EffectiveSize(manualCard, 210) == new Size(430, 280),
+            "Manual width and height take precedence over content growth and collapse");
+        var constrainedManual = CardWindowLayout.Fit(CardWindowLayout.EffectiveSize(manualCard, 900), null, tiny, 192);
+        var restoredManual = CardWindowLayout.Fit(CardWindowLayout.EffectiveSize(manualCard, 900), constrainedManual.Location, primary, 96);
+        pass(tiny.Contains(constrainedManual) && restoredManual.Size == new Size(430, 280) &&
+             manualCard.Width == 430 && manualCard.Height == 280,
+            "A temporary monitor or DPI limit restores the full manual preference when room returns");
+        pass(CardWindowLayout.Fit(CardWindowLayout.EffectiveSize(automaticCard, 640), new Point(-1600, -100), left, 144).Size == new Size(480, 960) &&
+             CardWindowLayout.Fit(CardWindowLayout.EffectiveSize(automaticCard, 240), new Point(-1600, -100), left, 144).Size == new Size(480, 480),
+            "Content growth and collapse use the current monitor DPI without persisting physical pixels");
+        pass(CardWindowLayout.ClampPreference("next", new Size(20, 10)) == new Size(300, 260) &&
+             CardWindowLayout.ClampPreference("calendar", new Size(20, 10)) == new Size(600, 420) &&
+             CardWindowLayout.ClampPreference("manage", new Size(20, 10)) == new Size(480, 320) &&
+             tiny.Contains(CardWindowLayout.Fit(CardWindowLayout.MinimumSize("calendar"), null, tiny, 192)),
+            "Native resize minimums keep controls usable and still yield to a tiny monitor work area");
+        pass(!CardWindowLayout.IsValidRequest(0, 320) && !CardWindowLayout.IsValidRequest(320, -1) &&
+             !CardWindowLayout.IsValidRequest(int.MaxValue, 320) && CardWindowLayout.IsValidRequest(320, 640),
+            "Malformed resize dimensions are rejected before native window changes");
+        pass(new[] { "w", "e", "n", "nw", "ne", "s", "sw", "se" }.Select(CardWindowLayout.ResizeHitTest)
+                 .SequenceEqual(Enumerable.Range(10, 8)) &&
+             CardWindowLayout.ResizeHitTest("caption") == 0 && CardWindowLayout.ResizeHitTest(null) == 0,
+            "Only the eight explicit native edge and corner resize directions are accepted");
+
         var pet = new Rectangle(800, 640, 200, 270);
         var kite = PetAnimationLayout.Fit(pet, 200, true, 70, 96, primary);
         pass(kite == new Rectangle(800, 624, 200, 286), "Small kite viewport follows the chosen style instead of a fixed minimum size");

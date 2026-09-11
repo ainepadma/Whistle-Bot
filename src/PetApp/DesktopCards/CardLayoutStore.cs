@@ -95,6 +95,19 @@ internal sealed class CardLayoutStore
                     ResizeLegacyCard(kind, size.Width, size.Height);
                 }
                 _document.Version = 8;
+            }
+
+            if (_document.Version < 9)
+            {
+                // Earlier releases ignored stored dimensions, so these are old fixed
+                // sizes rather than user resize preferences. Preserve position and pinning.
+                foreach (var kind in new[] { "today", "next", "calendar", "manage" })
+                {
+                    var size = CardWindowLayout.PreferredSize(kind);
+                    ResizeLegacyCard(kind, size.Width, size.Height);
+                    if (_document.Cards.TryGetValue(kind, out var layout)) layout.ManualSize = false;
+                }
+                _document.Version = 9;
                 SaveLocked();
             }
         }
@@ -142,7 +155,7 @@ internal sealed class CardLayoutStore
 
 internal sealed class CardLayoutDocument
 {
-    public int Version { get; set; } = 8;
+    public int Version { get; set; } = 9;
     public Dictionary<string, CardLayout> Cards { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -151,8 +164,9 @@ internal sealed class CardLayout
     public string Kind { get; set; } = "today";
     public int X { get; set; } = int.MinValue;
     public int Y { get; set; } = int.MinValue;
-    public int Width { get; set; } = 400;
-    public int Height { get; set; } = 300;
+    public int Width { get; set; } = 320;
+    public int Height { get; set; } = 320;
+    public bool ManualSize { get; set; }
     public bool Visible { get; set; }
     public bool Pinned { get; set; }
     public bool AlwaysOnTop { get; set; }

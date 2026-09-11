@@ -31,14 +31,14 @@ export default function ManagementCard(): JSX.Element {
     const back = () => setPage('home')
 
     return (
-        <section className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50/80 dark:bg-zinc-950">
+        <section className="management-content flex h-full min-h-0 flex-col overflow-hidden bg-white dark:bg-zinc-950">
             {page === 'home' && <div className="flex shrink-0 items-center border-b border-slate-200/80 bg-white/75 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-950/75">
                 <p className="text-xs font-semibold tracking-wide text-slate-600 dark:text-zinc-300">日程管理工具</p>
             </div>}
             {page === 'home' ? (
-                <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-3 overflow-y-auto p-[12px] min-[480px]:grid-cols-2 min-[840px]:grid-cols-3">
+                <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto p-[16px] min-[420px]:grid-cols-2 min-[660px]:grid-cols-3">
                     {ACTIONS.map((action) => (
-                        <button key={action.page} onClick={() => setPage(action.page)} className="flex min-h-24 flex-col rounded-xl border border-slate-200/90 bg-white p-3 text-left shadow-[0_2px_8px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-px hover:border-primary-300 hover:bg-primary-50/40 hover:shadow-[0_8px_18px_rgba(37,99,235,0.10)] dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-primary-800 dark:hover:bg-primary-950/20">
+                        <button key={action.page} onClick={() => setPage(action.page)} className="flex min-h-24 flex-col rounded-md p-3 text-left transition-colors hover:bg-primary-50 dark:hover:bg-primary-950/20">
                             <Icon name={action.icon} className="h-5 w-5 text-primary-600 dark:text-primary-300" />
                             <span className="mt-2 text-xs font-semibold">{action.label}</span>
                             <span className="mt-1 text-[10px] leading-4 text-zinc-500 dark:text-zinc-400">{action.description}</span>
@@ -46,7 +46,7 @@ export default function ManagementCard(): JSX.Element {
                     ))}
                 </div>
             ) : (
-                <div className="min-h-0 flex-1 overflow-hidden p-[12px]">
+                <div className="min-h-0 flex-1 overflow-hidden">
                     <Suspense fallback={<div className="flex h-full items-center justify-center"><div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-950" /></div>}>
                         {page === 'plan' && <PlanManagementPage onBack={back} />}
                         {page === 'todo' && <TodoManagementPage onBack={back} />}
