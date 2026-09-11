@@ -1,7 +1,9 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import type { Event } from '@shared/types/event'
 import Modal from './ui/Modal'
 import { useEventUiStore } from '@/stores/event-ui.store'
 import { useEventStore } from '@/stores/event.store'
+import { isRecurringEvent, loadSeriesEvent, seriesId } from '@/utils/recurrence'
 
 const EventEdit = lazy(() => import('@/pages/EventEdit'))
 const EventDetail = lazy(() => import('@/pages/EventDetail'))
@@ -46,10 +48,10 @@ export default function EventFlow(): JSX.Element | null {
                         onClose={close}
                         onEdit={() => openEdit(event)}
                         onToggleComplete={async () => {
-                            const updated = await updateEvent(event.id, { is_completed: !event.is_completed })
+                            const updated = await updateEvent(seriesId(event), { is_completed: !event.is_completed })
                             useEventUiStore.getState().openDetail(updated)
                         }}
-                        onDelete={async () => { await removeEvent(event.id); close() }}
+                        onDelete={async () => { await removeEvent(seriesId(event)); close() }}
                     />
                 </Suspense>
             </Modal>
@@ -58,21 +60,35 @@ export default function EventFlow(): JSX.Element | null {
 
     if (mode === 'edit' && event) {
         return (
-            <Modal onClose={close} title="编辑日程">
+            <Modal onClose={close} title={isRecurringEvent(event) ? '编辑整个重复日程' : '编辑日程'}>
                 <Suspense fallback={null}>
-                    <EventEdit
-                        event={event}
-                        onSave={async (data) => {
-                            const { calendar_id: _calendarId, ...input } = data
-                            await updateEvent(event.id, input)
-                            close()
-                        }}
-                        onCancel={close}
-                    />
+                    <ExistingEventEditor key={event.id} selected={event} close={close} />
                 </Suspense>
             </Modal>
         )
     }
 
     return null
+}
+
+function ExistingEventEditor({ selected, close }: { selected: Event; close: () => void }): JSX.Element {
+    const [event, setEvent] = useState<Event | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    const updateEvent = useEventStore((s) => s.updateEvent)
+    useEffect(() => {
+        let mounted = true
+        void loadSeriesEvent(selected).then((root) => { if (mounted) setEvent(root) }, (err) => {
+            if (mounted) setError(String(err))
+        })
+        return () => { mounted = false }
+    }, [selected])
+    if (error) return <p role="alert" className="text-sm text-red-500">{error}</p>
+    if (!event) return <p className="text-sm text-zinc-500">正在读取日程…</p>
+    return <>
+        {isRecurringEvent(event) && <p className="mb-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">正在编辑整个重复日程。下面显示首次日程的日期；保存会影响所有重复日期。</p>}
+        <EventEdit event={event} onCancel={close} onSave={async (data) => {
+            await updateEvent(event.id, data)
+            close()
+        }} />
+    </>
 }

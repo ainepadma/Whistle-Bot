@@ -6,6 +6,7 @@ import { useCourseStore } from '@/stores/course.store'
 import { useCourseCalendarStore } from '@/stores/course-calendar.store'
 import { COURSE_COLORS } from '@shared/types/course'
 import ScheduleTimeFields from '@/components/ScheduleTimeFields'
+import { repeatChoice, ruleForSave, type RepeatChoice } from '@/utils/recurrence'
 
 interface EventEditProps {
     event?: Event // 编辑模式传入已有日程
@@ -23,7 +24,6 @@ type EditItemType = EventType | 'course'
 const WEEKDAY_NAMES = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 type WeekPreset = 'all' | 'odd' | 'even' | 'first8' | 'last8'
-type RepeatFrequency = 'none' | 'daily' | 'weekly' | 'monthly'
 
 const WEEK_PRESET_OPTIONS: { key: WeekPreset; label: string }[] = [
     { key: 'all', label: '全学期' },
@@ -32,11 +32,6 @@ const WEEK_PRESET_OPTIONS: { key: WeekPreset; label: string }[] = [
     { key: 'first8', label: '前8周' },
     { key: 'last8', label: '后8周' }
 ]
-
-function repeatFrequencyFromRule(rule: string | null | undefined): RepeatFrequency {
-    const frequency = rule?.match(/(?:^|;)FREQ=([A-Z]+)/i)?.[1]?.toLowerCase()
-    return frequency === 'daily' || frequency === 'weekly' || frequency === 'monthly' ? frequency : 'none'
-}
 
 function generateWeeks(preset: WeekPreset, totalWeeks: number): number[] {
     switch (preset) {
@@ -90,9 +85,11 @@ export default function EventEdit({
     const [itemType, setItemType] = useState<EditItemType>(event?.item_type ?? initialType ?? 'plan')
     const [description, setDescription] = useState(event?.description || '')
     const [location, setLocation] = useState(event?.location || '')
-    const [reminderMinutes, setReminderMinutes] = useState(event?.reminders?.[0]?.minutes ?? 0)
-    const [repeatFrequency, setRepeatFrequency] = useState<RepeatFrequency>(() => repeatFrequencyFromRule(event?.rrule_str))
+    const [reminderMinutes, setReminderMinutes] = useState(event?.reminders?.[0]?.minutes ?? -1)
+    const [reminderEdited, setReminderEdited] = useState(false)
+    const [repeatFrequency, setRepeatFrequency] = useState<RepeatChoice>(() => repeatChoice(event?.rrule_str))
     const [saving, setSaving] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
     // 学期节次快捷填充（计划/待办）
     const [periodDate, setPeriodDate] = useState(dayjs().format('YYYY-MM-DD'))
@@ -147,6 +144,7 @@ export default function EventEdit({
         if (!title.trim() || saving) return
 
         setSaving(true)
+        setError(null)
         try {
             if (isCourseMode) {
                 const semesterId = courseSemesterId || activeSemester?.id
@@ -188,15 +186,20 @@ export default function EventEdit({
             await onSave({
                 calendar_id: event?.calendar_id || 'default',
                 title: title.trim(),
-                start_at: startIso,
-                end_at: endIso,
+                start_at: event && startAt === dayjs(event.start_at).format('YYYY-MM-DDTHH:mm') && isAllDay === event.is_all_day
+                    ? event.start_at : startIso,
+                end_at: event && startAt === dayjs(event.start_at).format('YYYY-MM-DDTHH:mm') && endAt === dayjs(event.end_at).format('YYYY-MM-DDTHH:mm') && isAllDay === event.is_all_day && itemType === (event.item_type ?? 'plan')
+                    ? event.end_at : endIso,
                 is_all_day: isAllDay,
                 item_type: itemType === 'todo' ? 'todo' : 'plan',
                 description: description.trim(),
                 location: location.trim(),
-                rrule_str: repeatFrequency === 'none' ? null : `FREQ=${repeatFrequency.toUpperCase()}`,
-                reminders: reminderMinutes > 0 ? [{ minutes: reminderMinutes }] : []
+                rrule_str: ruleForSave(repeatFrequency, event?.rrule_str),
+                reminders: event && !reminderEdited
+                    ? event.reminders : reminderMinutes >= 0 ? [{ minutes: reminderMinutes }] : []
             })
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setSaving(false)
         }
@@ -215,6 +218,7 @@ export default function EventEdit({
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <p role="alert" className="text-sm text-red-500">保存失败：{error}</p>}
             {/* 标题 */}
             <div>
                 <input
@@ -384,11 +388,13 @@ export default function EventEdit({
                         <label className="block text-xs text-gray-400 mb-1">提醒</label>
                         <select
                             value={reminderMinutes}
-                            onChange={e => setReminderMinutes(Number(e.target.value))}
+                            onChange={e => { setReminderEdited(true); setReminderMinutes(Number(e.target.value)) }}
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
                              bg-white dark:bg-gray-800 text-sm"
                         >
-                            <option value={0}>不提醒</option>
+                            <option value={-1}>不提醒</option>
+                            <option value={0}>准时提醒</option>
+                            {![ -1, 0, 5, 10, 15, 30, 60, 1440 ].includes(reminderMinutes) && <option value={reminderMinutes}>提前 {reminderMinutes} 分钟</option>}
                             <option value={5}>提前 5 分钟</option>
                             <option value={10}>提前 10 分钟</option>
                             <option value={15}>提前 15 分钟</option>
@@ -403,16 +409,17 @@ export default function EventEdit({
                         <label className="block text-xs text-gray-400 mb-1">重复</label>
                         <select
                             value={repeatFrequency}
-                            onChange={e => setRepeatFrequency(e.target.value as RepeatFrequency)}
+                            onChange={e => setRepeatFrequency(e.target.value as RepeatChoice)}
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600
                              bg-white dark:bg-gray-800 text-sm"
                         >
+                            {repeatChoice(event?.rrule_str) === 'preserve' && <option value="preserve">保留原有重复规则</option>}
                             <option value="none">不重复</option>
                             <option value="daily">每天</option>
                             <option value="weekly">每周</option>
                             <option value="monthly">每月</option>
                         </select>
-                        {repeatFrequency !== 'none' && reminderMinutes > 0 && (
+                        {repeatFrequency !== 'none' && reminderMinutes >= 0 && (
                             <p className="mt-1 text-xs text-gray-400">会为未来 90 天内的每次重复日程创建提醒。</p>
                         )}
                     </div>

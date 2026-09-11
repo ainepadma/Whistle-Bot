@@ -55,7 +55,7 @@ internal sealed class CardLayoutStore
                 _document.Version = 5;
             }
 
-            if (_document.Version >= 6) return;
+            if (_document.Version >= 7) return;
 
             // Fold legacy single-purpose cards into one action card. Prefer the
             // focused task card's placement so currently pinned workflows stay put.
@@ -84,7 +84,12 @@ internal sealed class CardLayoutStore
             }
 
             foreach (var legacy in new[] { "focus", "todo", "upcoming", "quick" }) _document.Cards.Remove(legacy);
-            _document.Version = 6;
+            foreach (var kind in new[] { "today", "next", "calendar", "manage" })
+            {
+                var size = CardWindowLayout.PreferredSize(kind);
+                ResizeLegacyCard(kind, size.Width, size.Height);
+            }
+            _document.Version = 7;
             SaveLocked();
         }
     }
@@ -122,18 +127,16 @@ internal sealed class CardLayoutStore
         }
     }
 
-    private static CardLayout Default(string kind) => kind switch
+    private static CardLayout Default(string kind)
     {
-        "calendar" => new CardLayout { Kind = kind, Width = 960, Height = 640 },
-        "next" => new CardLayout { Kind = kind, Width = 390, Height = 420, AlwaysOnTop = true },
-        "manage" => new CardLayout { Kind = kind, Width = 820, Height = 680 },
-        _ => new CardLayout { Kind = "today", Width = 352, Height = 320 }
-    };
+        var size = CardWindowLayout.PreferredSize(kind);
+        return new CardLayout { Kind = kind, Width = size.Width, Height = size.Height, AlwaysOnTop = kind == "next" };
+    }
 }
 
 internal sealed class CardLayoutDocument
 {
-    public int Version { get; set; } = 6;
+    public int Version { get; set; } = 7;
     public Dictionary<string, CardLayout> Cards { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -142,8 +145,8 @@ internal sealed class CardLayout
     public string Kind { get; set; } = "today";
     public int X { get; set; } = int.MinValue;
     public int Y { get; set; } = int.MinValue;
-    public int Width { get; set; } = 352;
-    public int Height { get; set; } = 520;
+    public int Width { get; set; } = 400;
+    public int Height { get; set; } = 480;
     public bool Visible { get; set; }
     public bool Pinned { get; set; }
     public bool AlwaysOnTop { get; set; }

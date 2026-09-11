@@ -87,7 +87,8 @@ internal sealed class ScheduleRpcBridge
             "export:select-file" => _transfer.SelectImportFile(),
             "export:save-file" => _transfer.SaveFile(args[0]),
 
-            "system:app-version" => Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "dev",
+            "system:app-version" => Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "开发版",
             "system:platform" => "win32",
             "system:is-auto-start" => _desktop.IsAutostartEnabled(),
             "system:set-auto-start" => SetAutostart(args[0].GetBoolean()),

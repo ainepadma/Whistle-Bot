@@ -6,6 +6,7 @@ import { useEventUiStore } from '@/stores/event-ui.store'
 import { useEventStore } from '@/stores/event.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { formatClock } from '@/utils/format'
+import { isRecurringEvent, seriesId } from '@/utils/recurrence'
 
 function useClampedPosition(x: number, y: number): {
     ref: React.RefObject<HTMLDivElement>
@@ -118,10 +119,15 @@ function DetailPopup(): JSX.Element | null {
     const { ref, pos } = useClampedPosition(payload?.x ?? 0, payload?.y ?? 0)
     const [event, setEvent] = useState<Event | null>(payload?.event ?? null)
     const [confirmDelete, setConfirmDelete] = useState(false)
+    const [confirmComplete, setConfirmComplete] = useState(false)
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         setEvent(payload?.event ?? null)
         setConfirmDelete(false)
+        setConfirmComplete(false)
+        setError(null)
     }, [payload])
 
     if (!payload || !event) return null
@@ -130,6 +136,7 @@ function DetailPopup(): JSX.Element | null {
     const end = dayjs(event.end_at)
     const isTodo = event.item_type === 'todo'
     const isCourse = Boolean(event.is_course)
+    const recurring = isRecurringEvent(event)
     const timeText = isTodo
         ? `截止 ${event.is_all_day ? start.format('YYYY年M月D日') : `${start.format('YYYY年M月D日')} ${formatClock(start, timeFormat)}`}`
         : event.is_all_day
@@ -137,20 +144,28 @@ function DetailPopup(): JSX.Element | null {
             : `${start.format('YYYY年M月D日')} ${formatClock(start, timeFormat)} - ${formatClock(end, timeFormat)}`
 
     const toggleComplete = async () => {
-        const updated = await updateEvent(event.id, { is_completed: !event.is_completed })
-        setEvent(updated)
-        useSchedulePopupStore.setState({
-            detail: { event: updated, x: payload.x, y: payload.y }
-        })
+        if (busy) return
+        if (recurring && !confirmComplete) { setConfirmComplete(true); return }
+        setBusy(true)
+        try {
+            const updated = await updateEvent(seriesId(event), { is_completed: !event.is_completed })
+            const displayed = { ...event, is_completed: updated.is_completed }
+            setEvent(displayed)
+            useSchedulePopupStore.setState({ detail: { event: displayed, x: payload.x, y: payload.y } })
+        } catch (err) { setError(String(err)) }
+        finally { setBusy(false) }
     }
 
     const handleDelete = async () => {
+        if (busy) return
         if (!confirmDelete) {
             setConfirmDelete(true)
             return
         }
-        await removeEvent(event.id)
-        close()
+        setBusy(true)
+        try { await removeEvent(seriesId(event)); close() }
+        catch (err) { setError(String(err)) }
+        finally { setBusy(false) }
     }
 
     return (
@@ -213,28 +228,34 @@ function DetailPopup(): JSX.Element | null {
                     )}
                 </div>
 
+                {recurring && <p className="px-4 pb-2 text-xs text-amber-600 dark:text-amber-300">以下操作影响整个重复日程。修改日期请使用“编辑整系列”。</p>}
+                {confirmComplete && <p role="alert" className="px-4 pb-2 text-xs text-red-500">再次点击将{event.is_completed ? '重新打开' : '完成'}所有重复日期。<button onClick={() => setConfirmComplete(false)} className="underline">取消</button></p>}
+                {confirmDelete && recurring && <p role="alert" className="px-4 pb-2 text-xs text-red-500">将删除所有重复日期。</p>}
+                {error && <p role="alert" className="px-4 pb-2 text-xs text-red-500">{error}</p>}
                 {!isCourse && (
-                    <div className="flex items-center justify-end gap-2 px-4 py-3 border-t
+                    <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t
                      border-gray-100 dark:border-gray-800">
                         {isTodo && (
                             <button
                                 onClick={toggleComplete}
+                                disabled={busy}
                                 className={`px-3 py-1.5 text-xs rounded-lg border transition-colors
                                     ${event.is_completed
                                         ? 'border-green-300 dark:border-green-700 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
                                         : 'border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
                             >
-                                {event.is_completed ? '重新打开' : '标记完成'}
+                                {confirmComplete ? '确认' : ''}{event.is_completed ? (recurring ? '重新打开整系列' : '重新打开') : (recurring ? '完成整系列' : '标记完成')}
                             </button>
                         )}
                         <button
                             onClick={handleDelete}
+                            disabled={busy}
                             className={`px-3 py-1.5 text-xs rounded-lg border transition-colors
                                 ${confirmDelete
                                     ? 'bg-red-500 border-red-500 text-white'
                                     : 'border-red-300 dark:border-red-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
                         >
-                            {confirmDelete ? '确认删除' : '删除'}
+                            {confirmDelete ? '确认删除' : '删除'}{recurring ? '整系列' : ''}
                         </button>
                         <button
                             onClick={() => {
@@ -244,7 +265,7 @@ function DetailPopup(): JSX.Element | null {
                             className="px-3 py-1.5 text-xs rounded-lg bg-primary-500 text-white
                              hover:bg-primary-600 transition-colors"
                         >
-                            编辑
+                            {recurring ? '编辑整系列' : '编辑'}
                         </button>
                     </div>
                 )}

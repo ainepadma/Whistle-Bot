@@ -51,9 +51,9 @@ export default function CardApp(): JSX.Element {
     }
 
     return (
-        <div className="flex h-screen flex-col overflow-hidden rounded-[18px] border border-slate-200/90 bg-slate-50 text-slate-900 shadow-[0_16px_40px_rgba(15,23,42,0.14)] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
+        <div className="desktop-card-shell flex h-full flex-col overflow-hidden rounded-[18px] border border-slate-200/90 bg-slate-50 text-slate-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
             <div onPointerDown={startDrag}
-                className={`flex h-10 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-3 text-xs shadow-[0_1px_0_rgba(15,23,42,0.02)] select-none dark:border-zinc-800 dark:bg-zinc-950 ${presentation.pinned ? 'cursor-default' : 'cursor-move'}`}>
+                className={`desktop-card-toolbar relative z-10 flex h-[40px] shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-[12px] text-xs select-none dark:border-zinc-800 dark:bg-zinc-950 ${presentation.pinned ? 'cursor-default' : 'cursor-move'}`}>
                 <div className="flex min-w-0 items-center"><CardLinks current={kind} pinned={presentation.pinned} /></div>
                 <div className="flex items-center gap-1">
                     <button onClick={() => void window.electronAPI.card.togglePinned(kind)} aria-label={presentation.pinned ? '解除固定' : '固定在桌面'}
@@ -65,11 +65,11 @@ export default function CardApp(): JSX.Element {
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden">
+            <div className={`min-h-0 flex-1 overflow-hidden ${kind === 'today' || kind === 'next' || view === 'create' ? 'desktop-card-compact' : ''}`}>
                 {view === 'create' ? (
                     <CreateCard key={createKey} onCancel={() => setView('content')} onSaved={() => { setCreateKey((value) => value + 1); setView('content') }} />
                 ) : kind === 'calendar' ? <CalendarCard /> : kind === 'next' ? <NextCard /> : kind === 'manage' ? <ManagementCard /> : (
-                    <TodayCard onClose={() => void window.electronAPI.card.close(kind)} onCreate={() => setView('create')} />
+                    <TodayCard onCreate={() => setView('create')} />
                 )}
             </div>
             <SchedulePopups />

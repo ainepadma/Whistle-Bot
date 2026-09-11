@@ -5,6 +5,7 @@ import { useEventStore } from '@/stores/event.store'
 import { useEventUiStore } from '@/stores/event-ui.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { formatClock } from '@/utils/format'
+import { isRecurringEvent } from '@/utils/recurrence'
 
 interface Props {
     onBack: () => void
@@ -26,6 +27,7 @@ export default function TodoManagementPage({ onBack }: Props): JSX.Element {
     }, [loadEvents])
 
     const toggleComplete = async (e: Event): Promise<void> => {
+        if (isRecurringEvent(e)) { openDetail(e); return }
         await updateEvent(e.id, { is_completed: !e.is_completed })
     }
 
@@ -64,6 +66,8 @@ export default function TodoManagementPage({ onBack }: Props): JSX.Element {
                             <button
                                 type="button"
                                 onClick={() => toggleComplete(e)}
+                                aria-label={isRecurringEvent(e) ? `处理整个重复待办 ${e.title}` : `切换完成状态 ${e.title}`}
+                                title={isRecurringEvent(e) ? '打开详情，确认操作整个重复待办' : undefined}
                                 className={`w-5 h-5 rounded border flex items-center justify-center text-xs flex-shrink-0
                                     ${e.is_completed
                                         ? 'bg-green-500 border-green-500 text-white'

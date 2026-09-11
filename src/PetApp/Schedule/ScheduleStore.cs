@@ -13,9 +13,11 @@ internal sealed partial class ScheduleStore
     private readonly string _connectionString;
     private readonly object _initializationGate = new();
     private bool _initialized;
+    private readonly bool _migrateLegacy;
 
-    public ScheduleStore(string? databasePath = null)
+    public ScheduleStore(string? databasePath = null, bool migrateLegacy = true)
     {
+        _migrateLegacy = migrateLegacy;
         databasePath ??= Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "BanyaoPet", "data", "schedule.db");
@@ -73,7 +75,7 @@ internal sealed partial class ScheduleStore
             EnsureReminderSchema(db);
             EnsureFocusSessionSchema(db);
             EnsureLegacyMigrationSchema(db);
-            TryMigrateLegacyMotodo(db);
+            if (_migrateLegacy) TryMigrateLegacyMotodo(db);
             _initialized = true;
         }
     }
@@ -82,10 +84,16 @@ internal sealed partial class ScheduleStore
     {
         var start = RequiredString(query, "start");
         var end = RequiredString(query, "end");
+        if (!DateTimeOffset.TryParse(start, out var rangeStart) ||
+            !DateTimeOffset.TryParse(end, out var rangeEnd) || rangeEnd <= rangeStart)
+            throw new InvalidOperationException("查询时间范围无效");
+        var expand = !query.TryGetProperty("expand", out var expandValue) || expandValue.ValueKind != JsonValueKind.False;
         using var db = Open();
         db.Open();
         using var command = db.CreateCommand();
-        command.CommandText = "SELECT events.* FROM events JOIN calendars ON calendars.id = events.calendar_id WHERE calendars.is_visible = 1 AND (events.rrule_str IS NOT NULL OR (events.start_at < $end AND events.end_at > $start))";
+        // SQLite compares ISO strings lexically unless asked to parse them.
+        // julianday handles both Z and explicit offsets, including older imports.
+        command.CommandText = "SELECT events.* FROM events JOIN calendars ON calendars.id = events.calendar_id WHERE calendars.is_visible = 1 AND (NULLIF(events.rrule_str, '') IS NOT NULL OR (julianday(events.start_at) < julianday($end) AND julianday(events.end_at) > julianday($start)))";
         command.Parameters.AddWithValue("$start", start);
         command.Parameters.AddWithValue("$end", end);
         if (TryString(query, "item_type", out var itemType))
@@ -98,8 +106,9 @@ internal sealed partial class ScheduleStore
             command.CommandText += " AND is_completed = $completed";
             command.Parameters.AddWithValue("$completed", completed.GetBoolean() ? 1 : 0);
         }
-        command.CommandText += " ORDER BY start_at ASC";
-        return ExpandRecurringEvents(ReadEvents(command), start, end);
+        command.CommandText += " ORDER BY julianday(start_at) ASC";
+        var events = ReadEvents(command);
+        return expand ? ExpandRecurringEvents(events, start, end) : events;
     }
 
     public Dictionary<string, object?>? GetEvent(string id)

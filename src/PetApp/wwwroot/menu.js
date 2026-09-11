@@ -149,6 +149,8 @@
       post({ type: 'shortcut' });
     } else if (action === 'update-check') {
       post({ type: 'update-check' });
+    } else if (action === 'guide') {
+      post({ type: 'guide' });
     } else if (action === 'about') {
       post({ type: 'about' });
     } else if (action === 'uninstall') {

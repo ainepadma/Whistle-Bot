@@ -21,7 +21,7 @@ internal sealed partial class ScheduleStore
             }
             result.AddRange(ExpandOne(item, rule, start, end));
         }
-        return result.OrderBy(x => (string)x["start_at"]!).ToArray();
+        return result.OrderBy(x => DateTimeOffset.Parse((string)x["start_at"]!, CultureInfo.InvariantCulture)).ToArray();
     }
 
     private static IEnumerable<Dictionary<string, object?>> ExpandOne(
@@ -29,6 +29,17 @@ internal sealed partial class ScheduleStore
     {
         if (!DateTimeOffset.TryParse((string)root["start_at"]!, out var occurrence) ||
             !DateTimeOffset.TryParse((string)root["end_at"]!, out var originalEnd)) yield break;
+        TimeZoneInfo? zone = null;
+        if (root.GetValueOrDefault("timezone") is string zoneId && !string.IsNullOrWhiteSpace(zoneId))
+        {
+            try { zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId); }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException) { }
+        }
+        if (zone != null)
+        {
+            occurrence = TimeZoneInfo.ConvertTime(occurrence, zone);
+            originalEnd = TimeZoneInfo.ConvertTime(originalEnd, zone);
+        }
         var rule = ParseRRule(rrule);
         if (!rule.TryGetValue("FREQ", out var frequency))
         {
@@ -38,8 +49,8 @@ internal sealed partial class ScheduleStore
         frequency = frequency.ToUpperInvariant();
         var interval = ParsePositive(rule, "INTERVAL", 1);
         var maxCount = ParsePositive(rule, "COUNT", int.MaxValue);
-        var until = ParseUntil(rule.GetValueOrDefault("UNTIL"));
-        var excludedDates = ReadExcludedDates(root["exdates"]);
+        var until = ParseUntil(rule.GetValueOrDefault("UNTIL"), zone, occurrence.Offset);
+        var excludedDates = ReadExcludedDates(root["exdates"], zone);
         var duration = originalEnd - occurrence;
         var rootStart = occurrence;
         var weekdaySet = ReadWeekdays(rule.GetValueOrDefault("BYDAY"), occurrence.DayOfWeek);
@@ -58,13 +69,16 @@ internal sealed partial class ScheduleStore
                 "YEARLY" => true,
                 _ => false
             };
+            if (zone?.IsInvalidTime(occurrence.DateTime) == true) valid = false;
             if (!valid && frequency is not ("DAILY" or "WEEKLY" or "MONTHLY" or "YEARLY")) yield break;
             if (until.HasValue && occurrence > until.Value) yield break;
             if (valid)
             {
                 emitted++;
-                if (Intersects(occurrence, occurrence + duration, rangeStart, rangeEnd) && !excludedDates.Contains(occurrence.Date))
-                    yield return CreateOccurrence(root, occurrence, duration);
+                var instance = CreateOccurrence(root, occurrence, duration, zone);
+                var end = DateTimeOffset.Parse((string)instance["end_at"]!, CultureInfo.InvariantCulture);
+                if (Intersects(occurrence, end, rangeStart, rangeEnd) && !excludedDates.Contains(occurrence.Date))
+                    yield return instance;
             }
 
             occurrence = frequency switch
@@ -75,19 +89,33 @@ internal sealed partial class ScheduleStore
                 "YEARLY" => occurrence.AddYears(interval),
                 _ => rangeEnd
             };
+            // Repeat at the same local clock time across daylight-saving changes.
+            if (zone != null)
+            {
+                var wallTime = occurrence.DateTime;
+                var offset = zone.IsAmbiguousTime(wallTime) ? zone.GetAmbiguousTimeOffsets(wallTime).Max() : zone.GetUtcOffset(wallTime);
+                occurrence = new DateTimeOffset(wallTime, offset);
+            }
         }
 
 
     }
 
-    private static Dictionary<string, object?> CreateOccurrence(Dictionary<string, object?> root, DateTimeOffset start, TimeSpan duration)
+    private static Dictionary<string, object?> CreateOccurrence(Dictionary<string, object?> root, DateTimeOffset start, TimeSpan duration, TimeZoneInfo? zone)
     {
+        var end = start.Add(duration);
+        if (root.GetValueOrDefault("is_all_day") is true && zone != null)
+        {
+            var rootStart = TimeZoneInfo.ConvertTime(DateTimeOffset.Parse((string)root["start_at"]!), zone);
+            var rootEnd = TimeZoneInfo.ConvertTime(DateTimeOffset.Parse((string)root["end_at"]!), zone);
+            end = IcsCodec.AtLocalTime(start.DateTime + (rootEnd.DateTime - rootStart.DateTime), zone);
+        }
         var occurrence = new Dictionary<string, object?>(root)
         {
             ["id"] = root["id"] + "@" + start.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture),
             ["recurrence_parent_id"] = root["id"],
             ["start_at"] = start.ToString("O"),
-            ["end_at"] = start.Add(duration).ToString("O")
+            ["end_at"] = end.ToString("O")
         };
         return occurrence;
     }
@@ -102,21 +130,23 @@ internal sealed partial class ScheduleStore
     private static int ParsePositive(IReadOnlyDictionary<string, string> rule, string key, int fallback) =>
         rule.TryGetValue(key, out var text) && int.TryParse(text, out var value) && value > 0 ? value : fallback;
 
-    private static DateTimeOffset? ParseUntil(string? value)
+    private static DateTimeOffset? ParseUntil(string? value, TimeZoneInfo? zone, TimeSpan offset)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         if (DateTimeOffset.TryParseExact(value, "yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var exact)) return exact;
         if (DateOnly.TryParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
-            return new DateTimeOffset(date.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+            return zone == null ? new DateTimeOffset(date.ToDateTime(TimeOnly.MaxValue), offset)
+                : IcsCodec.AtLocalTime(date.ToDateTime(TimeOnly.MaxValue), zone);
         return DateTimeOffset.TryParse(value, out var parsed) ? parsed : null;
     }
 
-    private static HashSet<DateTime> ReadExcludedDates(object? value)
+    private static HashSet<DateTime> ReadExcludedDates(object? value, TimeZoneInfo? zone)
     {
         var dates = new HashSet<DateTime>();
         if (value is not JsonElement json || json.ValueKind != JsonValueKind.Array) return dates;
         foreach (var item in json.EnumerateArray())
-            if (item.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(item.GetString(), out var date)) dates.Add(date.Date);
+            if (item.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(item.GetString(), out var date))
+                dates.Add(zone == null ? date.Date : TimeZoneInfo.ConvertTime(date, zone).Date);
         return dates;
     }
 

@@ -157,7 +157,7 @@ useEffect(() => {
                 <section className="ui-card p-5">
                     <h3 className="ui-section-title mb-2">桌宠服务</h3>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        日程、提醒和专注计时由小鹞 WhistleBot 统一管理。在线更新将在桌宠发行服务配置后提供。
+                        日程、提醒和专注计时由小鹞 WhistleBot 统一管理。可通过桌宠右键菜单“设置 → 检查更新”查看新版。
                     </p>
                 </section>
 
@@ -165,7 +165,7 @@ useEffect(() => {
                 <section className="ui-card p-5">
                     <h3 className="ui-section-title mb-3">关于</h3>
                     <div className="text-sm text-zinc-500 dark:text-zinc-400 space-y-1">
-                        <p>小鹞 WhistleBot · 日程与专注 v{appVersion || '开发版'}</p>
+                        <p>小鹞 WhistleBot · 日程与专注 {appVersion || '开发版'}</p>
                         <p>基于 .NET、WebView2、React 与 SQLite 构建</p>
                     </div>
                 </section>

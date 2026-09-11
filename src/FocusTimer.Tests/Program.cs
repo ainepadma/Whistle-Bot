@@ -21,6 +21,7 @@ internal static class Program
         Run("切换预设仅允许未运行且清空周期", TestPresetSwitchRules);
         Run("手动时长设置、规则与持久化", TestCustomDuration);
         Run("JSON 持久化与重启恢复", TestPersistenceRestore);
+        Run("自定义六轮在第五轮后重启不回退", TestCustomRoundRecovery);
         Run("运行中过期后推进并暂停+补发通知", TestExpiredRecovery);
         Console.WriteLine($"{_passed} passed, {_failed} failed");
         Environment.Exit(_failed == 0 ? 0 : 1);
@@ -232,6 +233,23 @@ internal static class Program
         Assert(s.PresetId == "45-10", "preset restored");
         Assert(s.Mode == "focus" && s.Status == "paused", "paused focus restored");
         Assert(s.RemainingSeconds == 2577, $"remaining restored ({s.RemainingSeconds})");
+    }
+
+    private static void TestCustomRoundRecovery()
+    {
+        var (svc, clock, dir) = NewService();
+        svc.SetCustom(1, 1, 1, 6);
+        svc.Toggle();
+        for (var i = 0; i < 5; i++) { svc.Skip(); svc.Skip(); }
+        svc.Toggle();
+        Assert(svc.GetState().CycleIndex == 5, "five rounds completed before restart");
+        svc.Dispose();
+        using var restored = new FocusTimerService(Path.Combine(dir, "focus.json"), () => clock.Now);
+        Assert(restored.GetState().CycleIndex == 5, "five rounds preserved after restart");
+        restored.Toggle();
+        restored.Skip();
+        Assert(restored.GetState().Mode == "long-break" && restored.GetState().CycleIndex == 6,
+            "the next completed focus reaches the configured long break");
     }
 
     private static void TestCustomDuration()

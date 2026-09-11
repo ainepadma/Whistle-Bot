@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import type { Event } from '@shared/types/event'
+import { useEventUiStore } from '@/stores/event-ui.store'
+import { isRecurringEvent } from '@/utils/recurrence'
 
 export default function TodoCard(): JSX.Element {
     const [items, setItems] = useState<Event[]>([])
@@ -25,6 +27,7 @@ export default function TodoCard(): JSX.Element {
     }, [])
 
     const finish = async (event: Event) => {
+        if (isRecurringEvent(event)) { useEventUiStore.getState().openDetail(event); return }
         await window.electronAPI.event.update(event.id, { is_completed: true })
     }
 
@@ -35,7 +38,7 @@ export default function TodoCard(): JSX.Element {
                 <div className="space-y-1.5">
                     {items.slice(0, 3).map((event) => (
                         <div key={event.id} className="flex items-center gap-2 rounded-lg border border-zinc-100 px-2 py-2 dark:border-zinc-800">
-                            <button onClick={() => void finish(event)} aria-label={`完成 ${event.title}`} className="h-4 w-4 shrink-0 rounded border border-amber-400 hover:bg-amber-400" />
+                            <button onClick={() => void finish(event)} aria-label={`${isRecurringEvent(event) ? '处理整个重复待办' : '完成'} ${event.title}`} className="h-4 w-4 shrink-0 rounded border border-amber-400 hover:bg-amber-400" />
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-xs font-medium">{event.title}</p>
                                 <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-300">{event.is_all_day ? dayjs(event.start_at).format('M月D日 截止') : dayjs(event.start_at).format('M月D日 HH:mm')}</p>

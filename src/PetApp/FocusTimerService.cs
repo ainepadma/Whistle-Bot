@@ -292,7 +292,7 @@ public sealed class FocusTimerService : IDisposable
             _state.Mode = ValidMode(p.Mode);
             _state.Status = ValidStatus(p.Status);
             if (_state.Mode == "idle" && _state.Status != "idle") _state.Status = "idle";
-            _state.CycleIndex = Math.Clamp(p.CycleIndex, 0, 4);
+            _state.CycleIndex = Math.Clamp(p.CycleIndex, 0, CurrentRounds());
             _state.TotalSeconds = p.TotalSeconds > 0 ? p.TotalSeconds : CurrentPreset().FocusSeconds;
             _state.RemainingSeconds = Math.Max(0, p.RemainingSeconds);
             _endUtc = p.EndTimeUtc;

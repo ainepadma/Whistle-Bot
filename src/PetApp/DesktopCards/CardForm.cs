@@ -13,6 +13,8 @@ internal sealed class CardForm : Form
     private ScheduleRpcBridge? _bridge;
     private System.Windows.Forms.Timer? _fadeTimer;
     private bool _contentReady;
+    private bool _requestedVisible;
+    private bool _activateOnReveal;
 
     public event EventHandler? ContentReady;
     public bool IsContentReady => _contentReady;
@@ -31,12 +33,12 @@ internal sealed class CardForm : Form
             _ => "今天"
         };
 
-        AutoScaleMode = AutoScaleMode.Dpi;
-        AutoScaleDimensions = new SizeF(96F, 96F);
+        // The entire client area is a WebView. Its CSS pixels are scaled explicitly
+        // against the destination monitor, including before the first window handle.
+        AutoScaleMode = AutoScaleMode.None;
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
-        MinimumSize = kind == "calendar" ? new Size(760, 520) : kind == "manage" ? new Size(560, 480) : kind == "next" ? new Size(340, 280) : new Size(340, 260);
         BackColor = Color.White;
 
         _web.Dock = DockStyle.Fill;
@@ -45,7 +47,12 @@ internal sealed class CardForm : Form
         Load += OnLoad;
         FormClosing += OnFormClosing;
         SizeChanged += (_, _) => UpdateRoundedRegion();
-        FormClosed += (_, _) => _fadeTimer?.Dispose();
+        DpiChanged += (_, args) =>
+        {
+            args.Cancel = true;
+            _manager.OnDpiChanged(this, args.SuggestedRectangle, args.DeviceDpiNew);
+            UpdateRoundedRegion();
+        };
     }
 
     public void BeginNativeDrag()
@@ -56,6 +63,9 @@ internal sealed class CardForm : Form
 
     public void Reveal(bool activate = true)
     {
+        _requestedVisible = true;
+        _activateOnReveal = activate;
+        StopFade();
         if (!Visible)
         {
             Opacity = 0;
@@ -67,18 +77,17 @@ internal sealed class CardForm : Form
 
     public void Conceal()
     {
+        _requestedVisible = false;
         if (!Visible) return;
         FadeTo(0, () =>
         {
-            if (!IsDisposed) Hide();
+            if (!IsDisposed && !_requestedVisible) Hide();
         });
     }
 
     private void FadeTo(double target, Action? completed = null)
     {
-        _fadeTimer?.Stop();
-        _fadeTimer?.Dispose();
-        _fadeTimer = null;
+        StopFade();
         if (!Visible || Math.Abs(Opacity - target) < 0.02)
         {
             Opacity = target;
@@ -103,7 +112,8 @@ internal sealed class CardForm : Form
 
     private void UpdateRoundedRegion()
     {
-        var radius = Math.Max(2, (int)Math.Round(20 * DeviceDpi / 96f));
+        if (Width <= 0 || Height <= 0) return;
+        var radius = Math.Min(Math.Min(Width, Height), Math.Max(2, (int)Math.Round(20 * DeviceDpi / 96f)));
         using var path = new System.Drawing.Drawing2D.GraphicsPath();
         path.AddArc(0, 0, radius, radius, 180, 90);
         path.AddArc(Width - radius, 0, radius, radius, 270, 90);
@@ -114,6 +124,21 @@ internal sealed class CardForm : Form
         Region = new Region(path);
     }
     public string Kind { get; }
+
+    protected override bool ShowWithoutActivation => !_activateOnReveal;
+
+    private void StopFade()
+    {
+        _fadeTimer?.Stop();
+        _fadeTimer?.Dispose();
+        _fadeTimer = null;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) StopFade();
+        base.Dispose(disposing);
+    }
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
@@ -138,7 +163,7 @@ internal sealed class CardForm : Form
             if (!args.IsSuccess) return;
             _contentReady = true;
             ContentReady?.Invoke(this, EventArgs.Empty);
-            if (Visible) FadeTo(1);
+            if (_requestedVisible && Visible) FadeTo(1);
         };
         _web.CoreWebView2.Navigate($"https://schedule.whistlebot.local/index.html?mode=card&type={Uri.EscapeDataString(Kind)}");
     }

@@ -1,4 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { Event } from '@shared/types/event'
+import { useEventUiStore } from '@/stores/event-ui.store'
+import { isRecurringEvent } from '@/utils/recurrence'
 
 interface ActiveFocusEvent {
     id: string
@@ -113,6 +116,18 @@ export default function FocusCard({ cardKind = 'focus', autoResize = true, onOpe
         await loadState()
     }
 
+    const completeAssociatedTodo = async () => {
+        const id = state.activeEvent?.id
+        if (!id) return
+        const event = await window.electronAPI.event.getById(id) as Event | null
+        if (!event) return
+        if (isRecurringEvent(event)) {
+            useEventUiStore.getState().openDetail(event)
+            return
+        }
+        await runAndRefresh(() => window.electronAPI.focus.completeEvent())
+    }
+
     return (
         <section ref={contentRef} className="mx-0 mb-2 overflow-hidden py-0">
             <div className="flex items-center justify-between text-xs text-zinc-500">
@@ -177,7 +192,7 @@ export default function FocusCard({ cardKind = 'focus', autoResize = true, onOpe
                     <div className="mt-1.5 flex justify-end gap-1.5">
                         <button onClick={() => onOpenEvent ? onOpenEvent(state.activeEvent!.id) : void window.electronAPI.focus.openEvent()} className="rounded px-2 py-1 text-[10px] text-primary-700 hover:bg-primary-100">查看日程</button>
                         {state.activeEvent.itemType === 'todo' && !state.activeEvent.isCompleted && (
-                            <button onClick={() => void runAndRefresh(() => window.electronAPI.focus.completeEvent())} className="rounded bg-primary-500 px-2 py-1 text-[10px] text-white hover:bg-primary-600">完成待办</button>
+                            <button onClick={() => void completeAssociatedTodo()} className="rounded bg-primary-500 px-2 py-1 text-[10px] text-white hover:bg-primary-600">完成待办</button>
                         )}
                         <button onClick={() => void runAndRefresh(() => window.electronAPI.focus.detachEvent())} className="rounded px-2 py-1 text-[10px] text-zinc-500 hover:bg-white/70">解除关联</button>
                     </div>

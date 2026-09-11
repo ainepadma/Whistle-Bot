@@ -66,7 +66,7 @@ export default function CreateCard({ onCancel, onSaved }: CreateCardProps): JSX.
 
     return (
         <div
-            className="mx-3 mb-3 max-h-[calc(100vh-3.75rem)] overflow-y-auto py-3"
+            className="desktop-card-panel ui-card overflow-y-auto"
         >
             <div className="mb-2 flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">新建日程</span>

@@ -8,6 +8,7 @@ namespace Schedule.Acceptance;
 internal static class Program
 {
     private static string _temporaryRoot = "";
+    private static int _passed;
 
     [STAThread]
     private static int Main()
@@ -19,7 +20,10 @@ internal static class Program
         {
             VerifyScheduleLifecycle();
             VerifyCardLayoutMigration();
-            Console.WriteLine("Schedule acceptance: 13 passed, 0 failed");
+            WindowsDataAcceptance.Run(_temporaryRoot, Pass);
+            WindowsLayoutAcceptance.Run(Pass);
+            WindowsIntegrationAcceptance.Run(Pass);
+            Console.WriteLine($"Schedule acceptance: {_passed} passed, 0 failed");
             return 0;
         }
         catch (Exception exception)
@@ -36,7 +40,7 @@ internal static class Program
 
     private static void VerifyScheduleLifecycle()
     {
-        var store = new ScheduleStore(Path.Combine(_temporaryRoot, "schedule.db"));
+        var store = new ScheduleStore(Path.Combine(_temporaryRoot, "schedule.db"), migrateLegacy: false);
         store.Initialize();
 
         var now = DateTimeOffset.UtcNow;
@@ -129,11 +133,31 @@ internal static class Program
 
         var store = new CardLayoutStore(path);
         var action = store.Get("next");
-        Pass(action.Width == 390 && action.Height == 420 && action.Pinned && action.Visible && action.X == 120 && action.Y == 80,
-            "Card layout v3 -> v6 action-card migration");
+        Pass(action.Width == 400 && action.Height == 480 && action.Pinned && action.Visible && action.X == 120 && action.Y == 80,
+            "Card layout v3 -> v7 action-card migration preserves placement and pinning");
         var calendar = store.Get("calendar");
-        Pass(calendar.Width == 960 && calendar.Height == 640,
+        Pass(calendar.Width == 960 && calendar.Height == 680,
             "Calendar card default layout");
+
+        var legacyPath = Path.Combine(_temporaryRoot, "cards-v6.json");
+        File.WriteAllText(legacyPath, """
+            {"Version":6,"Cards":{
+              "today":{"Kind":"today","Width":352,"Height":320,"X":-1600,"Y":120,"Pinned":true,"Visible":true},
+              "next":{"Kind":"next","Width":390,"Height":710,"X":80,"Y":60,"AlwaysOnTop":true},
+              "calendar":{"Kind":"calendar","Width":960,"Height":640},
+              "manage":{"Kind":"manage","Width":820,"Height":680}}}
+            """);
+        var migrated = new CardLayoutStore(legacyPath);
+        Pass(migrated.Get("today").Width == migrated.Get("next").Width &&
+             migrated.Get("today").Height == migrated.Get("next").Height &&
+             migrated.Get("calendar").Width == migrated.Get("manage").Width &&
+             migrated.Get("calendar").Height == migrated.Get("manage").Height,
+            "Existing v6 layouts migrate to two identical size tiers");
+        var reopened = new CardLayoutStore(legacyPath);
+        Pass(reopened.Get("today").X == -1600 && reopened.Get("today").Y == 120 &&
+             reopened.Get("today").Pinned && reopened.Get("today").Visible && reopened.Get("next").AlwaysOnTop &&
+             reopened.Get("next").Height == 480,
+            "Tier migration survives restart without losing positions or presentation settings");
     }
 
     private static string RequiredId(IReadOnlyDictionary<string, object?> item) =>
@@ -144,6 +168,7 @@ internal static class Program
     private static void Pass(bool condition, string name)
     {
         if (!condition) throw new InvalidOperationException($"FAIL {name}");
+        _passed++;
         Console.WriteLine($"PASS {name}");
     }
 }

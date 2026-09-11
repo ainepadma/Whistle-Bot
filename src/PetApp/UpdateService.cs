@@ -63,10 +63,31 @@ internal sealed class UpdateService
         return new UpdateManifest(version, download);
     }
 
-    private static string? ReadValue(string yaml, string key)
+    internal static string? ReadValue(string yaml, string key)
     {
-        var match = Regex.Match(yaml, $@"(?m)^\s*{Regex.Escape(key)}\s*:\s*(?<value>[^#\r\n]+)");
-        return match.Success ? match.Groups["value"].Value.Trim().Trim('"', '\'') : null;
+        // The release manifest uses single-line scalars. A '#' is a YAML
+        // comment only outside quotes and after whitespace; URL fragments
+        // such as /#download are part of the value.
+        var match = Regex.Match(yaml, $@"(?m)^[\t ]*{Regex.Escape(key)}[\t ]*:[\t ]*(?<value>[^\r\n]*)");
+        if (!match.Success) return null;
+        var value = match.Groups["value"].Value.Trim();
+        if (value.Length == 0 || value[0] == '#') return null;
+        if (value[0] is '"' or '\'')
+        {
+            var quote = value[0];
+            for (var i = 1; i < value.Length; i++)
+            {
+                if (quote == '"' && value[i] == '\\') { i++; continue; }
+                if (value[i] != quote) continue;
+                if (quote == '\'' && i + 1 < value.Length && value[i + 1] == quote) { i++; continue; }
+                var scalar = value[1..i];
+                return quote == '\'' ? scalar.Replace("''", "'") : System.Text.Json.JsonSerializer.Deserialize<string>(value[..(i + 1)]);
+            }
+            throw new InvalidOperationException("版本文件包含未闭合的引号。");
+        }
+        for (var i = 1; i < value.Length; i++)
+            if (value[i] == '#' && char.IsWhiteSpace(value[i - 1])) return value[..i].TrimEnd();
+        return value;
     }
 
     private sealed record UpdateManifest(Version Version, string DownloadUrl);

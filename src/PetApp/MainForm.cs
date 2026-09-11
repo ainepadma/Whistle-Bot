@@ -30,12 +30,11 @@ public sealed class MainForm : Form, IScheduleDesktopHost
 
     private readonly WebView2 _web = new();
     private readonly System.Windows.Forms.Timer _idleTimer = new() { Interval = 1000 };
-    private readonly System.Windows.Forms.Timer _noteZoneTimer = new() { Interval = 1800 };
     private readonly NotifyIcon _tray;
     private MenuForm? _menuForm;
     private string _petColor = "#2f86ed";
     private int _petSize;
-    private bool _noteZoneActive;
+    private bool _kiteModeActive;
     private Point _menuAnchor;
     private Size? _collapsedSize;
     private Size? _styleSize;
@@ -43,6 +42,7 @@ public sealed class MainForm : Form, IScheduleDesktopHost
     private Size? _bothSize;
     private FocusTimerService? _focusTimer;
     private FocusForm? _focusForm;
+    private GuideForm? _guideForm;
     private CardHostManager? _cardHost;
     private ScheduleStore? _scheduleStore;
     private ReminderScheduler? _reminderScheduler;
@@ -101,21 +101,25 @@ public sealed class MainForm : Form, IScheduleDesktopHost
         menu.Items.Add("退出", null, (_, _) => Close());
         _tray.ContextMenuStrip = menu;
         _tray.BalloonTipClicked += (_, _) => ShowFocus();
-        _noteZoneTimer.Tick += (_, _) =>
-        {
-            _noteZoneTimer.Stop();
-            _noteZoneActive = false;
-            ApplyPetRegion();
-        };
 
         Load += OnLoad;
-        DpiChanged += (_, _) => BeginInvoke((Action)ApplyPetRegion);
+        DpiChanged += (_, _) => BeginInvoke((Action)(() =>
+        {
+            if (IsDisposed || Disposing) return;
+            if (_kiteModeActive) FitKiteViewport();
+            ApplyPetRegion();
+        }));
         FormClosing += (_, _) =>
         {
+            if (_kiteModeActive)
+            {
+                _kiteModeActive = false;
+                Post(new { type = "kite-mode", active = false });
+            }
             NativeInput.StopKeyboardHook();
             _idleTimer.Stop();
-            _noteZoneTimer.Stop();
             _focusTimer?.Dispose();
+            _guideForm?.Close();
             _cardHost?.Dispose();
             _reminderScheduler?.Dispose();
             _tray.Visible = false;
@@ -124,6 +128,19 @@ public sealed class MainForm : Form, IScheduleDesktopHost
     }
 
     private async void OnLoad(object? sender, EventArgs e)
+    {
+        if (!WindowsIntegration.EnsureWebView2Runtime(this)) { Close(); return; }
+        try { await InitializeAsync(); }
+        catch (Exception exception)
+        {
+            if (IsDisposed) return;
+            MessageBox.Show(this, "无法启动小鹞 WhistleBot：\n" + exception.Message,
+                "启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Close();
+        }
+    }
+
+    private async Task InitializeAsync()
     {
         // DWM glass: black pixels become transparent on Win10/11, so the pet
         // floats on the desktop while the window still receives mouse input.
@@ -160,14 +177,11 @@ public sealed class MainForm : Form, IScheduleDesktopHost
         }
         _web.CoreWebView2.WebMessageReceived += OnWebMessage;
         _petColor = LoadColor();
-        var indexUri = WebAssets.Page("index.html");
-        var builder = new UriBuilder(indexUri);
-        builder.Query = (string.IsNullOrEmpty(builder.Query) ? "" : builder.Query.TrimStart('?') + "&")
-            + "size=" + _petSize + "&color=" + _petColor;
         var args = Environment.GetCommandLineArgs();
-        if (args.Length > 1 && args[1].StartsWith("pos=", StringComparison.Ordinal))
-            builder.Query += "&" + args[1];
-        _web.CoreWebView2.Navigate(builder.Uri.ToString());
+        var position = args.Length > 1 && args[1].StartsWith("pos=", StringComparison.Ordinal)
+            ? args[1][4..] : null;
+        var pageUri = BuildPetPageUri(WebAssets.Page("index.html"), _petSize, _petColor, position);
+        _web.CoreWebView2.Navigate(pageUri.AbsoluteUri);
         Post(new { type = "set-color", color = _petColor });
         Post(new { type = "size", size = _petSize });
         ApplyPetRegion();
@@ -194,18 +208,18 @@ public sealed class MainForm : Form, IScheduleDesktopHost
 
         NativeInput.KeyDown += vk => Post(new { type = "typing", key = vk });
         NativeInput.StartKeyboardHook();
+
+        if (GuideState.ShouldShow(ConfigDir))
+            BeginInvoke((Action)(() => ShowGuide(firstRun: true)));
     }
 
     /// <summary>Clip the window to the whistle silhouette so transparent areas
     /// do not swallow clicks and only the model itself is interactive.</summary>
     private void ApplyPetRegion()
     {
-        // Do not apply a native shape Region. WebView2 and WinForms can use
-        // different coordinate spaces under per-monitor DPI, so even a
-        // mathematically matching path may clip animated SVG pixels. DWM glass
-        // already keeps every transparent WebView pixel visually transparent.
-        Region?.Dispose();
-        Region = null;
+        // The page reports its animated SVG geometry in the actual viewport.
+        // The native region uses that geometry rather than a static DPI guess.
+        Post(new { type = "request-region" });
     }
 
     private void Post(object message)
@@ -238,10 +252,26 @@ public sealed class MainForm : Form, IScheduleDesktopHost
                         Location.Y + DpiLayout.ToDevice(this, dy));
                     break;
                 case "note-spawn":
-                    _noteZoneActive = true;
-                    _noteZoneTimer.Stop();
-                    _noteZoneTimer.Start();
                     ApplyPetRegion();
+                    break;
+                case "kite-mode":
+                    SetKiteMode(root.GetProperty("active").GetBoolean());
+                    break;
+                case "interaction-settings":
+                    // This request is emitted after pet.js attaches its
+                    // listener. Re-send appearance here because immediate
+                    // post-Navigate messages may precede the new document.
+                    Post(new { type = "size", size = _petSize });
+                    Post(new { type = "set-color", color = _petColor });
+                    Post(new { type = "interaction-settings", doubleClickMs = SystemInformation.DoubleClickTime });
+                    break;
+                case "pet-region":
+                    if (PetHitRegion.TryCreate(root, ClientSize, out var nextRegion))
+                    {
+                        var previousRegion = Region;
+                        Region = nextRegion;
+                        previousRegion?.Dispose();
+                    }
                     break;
                 case "quit":
                     Close();
@@ -261,6 +291,18 @@ public sealed class MainForm : Form, IScheduleDesktopHost
         {
             // Ignore malformed messages.
         }
+    }
+
+    internal static Uri BuildPetPageUri(Uri pageUri, int size, string color, string? position = null)
+    {
+        var builder = new UriBuilder(pageUri);
+        builder.Query = (string.IsNullOrEmpty(builder.Query) ? "" : builder.Query.TrimStart('?') + "&")
+            + "size=" + size.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "&color=" + Uri.EscapeDataString(color);
+        if (position is not null) builder.Query += "&pos=" + Uri.EscapeDataString(position);
+        // A raw '#' in the color becomes a URI fragment and leaves the page
+        // with an empty color query, so every value must be encoded above.
+        return builder.Uri;
     }
 
     private static int LoadSize()
@@ -352,6 +394,10 @@ public sealed class MainForm : Form, IScheduleDesktopHost
                 _menuForm?.Hide();
                 _ = _updateService.CheckAsync(this, interactive: true);
                 break;
+            case "guide":
+                _menuForm?.Hide();
+                ShowGuide(firstRun: false);
+                break;
             case "about":
                 OpenAbout();
                 break;
@@ -359,6 +405,7 @@ public sealed class MainForm : Form, IScheduleDesktopHost
                 Uninstall();
                 break;
             case "hide":
+                if (_kiteModeActive) SetKiteMode(false);
                 Hide();
                 break;
             case "quit":
@@ -694,34 +741,20 @@ public sealed class MainForm : Form, IScheduleDesktopHost
         }
     }
 
-    private static string AutostartTarget => Path.Combine(AppContext.BaseDirectory, "Bootstrap.exe");
-
-    private static bool IsAutostartEnabled()
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(RunKeyName);
-            return (key?.GetValue(RunValueName) as string) == AutostartTarget;
-        }
-        catch
-        {
-            return false;
-        }
-    }
+    private static bool IsAutostartEnabled() => WindowsIntegration.IsAutostartEnabled();
 
     private void SetAutostart(bool enable)
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(RunKeyName);
-            if (enable)
-                key.SetValue(RunValueName, "\"" + AutostartTarget + "\"");
-            else
-                key.DeleteValue(RunValueName, false);
-            Post(new { type = "autostart", enabled = IsAutostartEnabled() });
+            var enabled = WindowsIntegration.SetAutostart(enable);
+            Post(new { type = "autostart", enabled });
+            _menuForm?.Post(new { type = "autostart", enabled });
         }
-        catch
+        catch (Exception exception)
         {
+            MessageBox.Show(this, "无法修改开机自启动：\n" + exception.Message, "小鹞 WhistleBot",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -760,6 +793,43 @@ public sealed class MainForm : Form, IScheduleDesktopHost
         }
     }
 
+    private void ShowGuide(bool firstRun)
+    {
+        if (_guideForm is { IsDisposed: false })
+        {
+            _guideForm.Show();
+            _guideForm.Activate();
+            return;
+        }
+
+        var marked = false;
+        _guideForm = new GuideForm(_petColor, firstRun, () =>
+        {
+            if (!firstRun || marked) return;
+            try
+            {
+                GuideState.MarkSeen(ConfigDir);
+                marked = true;
+            }
+            catch
+            {
+                // A read-only profile can still use the guide this session.
+            }
+        });
+        _guideForm.FormClosed += (_, _) => _guideForm = null;
+
+        var screen = Screen.FromRectangle(Bounds);
+        var scale = Math.Max(1, DpiLayout.ForScreen(screen)) / 96d;
+        _guideForm.Size = new Size(
+            (int)Math.Round(540 * scale), (int)Math.Round(604 * scale));
+        var workArea = screen.WorkingArea;
+        _guideForm.Location = new Point(
+            workArea.Left + Math.Max(0, (workArea.Width - _guideForm.Width) / 2),
+            workArea.Top + Math.Max(0, (workArea.Height - _guideForm.Height) / 2));
+        _guideForm.Show(this);
+        _guideForm.Activate();
+    }
+
     private static string DesktopPath()
     {
         var d = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
@@ -772,56 +842,54 @@ public sealed class MainForm : Form, IScheduleDesktopHost
 
     private void Uninstall()
     {
-        try
+        _menuForm?.Hide();
+        if (WindowsIntegration.Uninstall(this)) Close();
+    }
+
+    private void FitKiteViewport()
+    {
+        var workArea = Screen.FromRectangle(Bounds).WorkingArea;
+        Bounds = PetAnimationLayout.Fit(Bounds, _petSize, _kiteModeActive,
+            NoteHeadroom, DeviceDpi, workArea);
+    }
+
+    private void SetKiteMode(bool active)
+    {
+        if (_kiteModeActive != active)
         {
-            using var key = Registry.CurrentUser.CreateSubKey(RunKeyName);
-            key.DeleteValue(RunValueName, false);
+            _kiteModeActive = active;
+            FitKiteViewport();
+            ApplyPetRegion();
         }
-        catch
+        // Acknowledge after the native resize/layout has been dispatched. Use
+        // current state so a rapid cancel cannot deliver a stale start reply.
+        BeginInvoke((Action)(() =>
         {
-        }
-        try
-        {
-            File.Delete(Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "小鹞 WhistleBot.lnk"));
-        }
-        catch
-        {
-        }
-        try
-        {
-            SaveConfig(280, "#2f86ed");
-        }
-        catch
-        {
-        }
-        var dir = AppContext.BaseDirectory;
-        var script = $"timeout /t 3 /nobreak >nul & rmdir /s /q \"{dir}\"";
-        try
-        {
-            Process.Start(new ProcessStartInfo("cmd.exe", $"/c {script}")
-            {
-                CreateNoWindow = true,
-                UseShellExecute = false
-            });
-        }
-        catch
-        {
-        }
-        Close();
+            if (IsDisposed || Disposing) return;
+            Post(new { type = "kite-mode", active = _kiteModeActive });
+        }));
     }
 
     private void ResizePet(int size)
     {
         size = Math.Clamp(size, 180, 420);
         _petSize = size;
-        Size = DpiLayout.ToDevice(this, new Size(size, size + NoteHeadroom));
-        var wa = Screen.FromRectangle(Bounds).WorkingArea;
-        if (wa.Width > 0)
+        if (_kiteModeActive)
         {
-            Location = new Point(
-                Math.Clamp(Location.X, wa.Left, Math.Max(wa.Left, wa.Right - Width)),
-                Math.Clamp(Location.Y, wa.Top, Math.Max(wa.Top, wa.Bottom - Height)));
+            // An explicit style change ends the temporary animation and keeps
+            // the current (possibly dragged) bottom center for the new size.
+            SetKiteMode(false);
+        }
+        else
+        {
+            Size = DpiLayout.ToDevice(this, new Size(size, size + NoteHeadroom));
+            var wa = Screen.FromRectangle(Bounds).WorkingArea;
+            if (wa.Width > 0)
+            {
+                Location = new Point(
+                    Math.Clamp(Location.X, wa.Left, Math.Max(wa.Left, wa.Right - Width)),
+                    Math.Clamp(Location.Y, wa.Top, Math.Max(wa.Top, wa.Bottom - Height)));
+            }
         }
         ApplyPetRegion();
         SaveConfig(size, _petColor);

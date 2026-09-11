@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import type { Event, EventCreateInput, EventUpdateInput, EventQueryInput } from '@shared/types/event'
 import dayjs from 'dayjs'
 
+let activeQuery: EventQueryInput | null = null
+let queryRevision = 0
+
 interface EventStore {
     events: Event[]
     loading: boolean
@@ -20,30 +23,35 @@ export const useEventStore = create<EventStore>((set, get) => ({
     error: null,
 
     loadEvents: async (query) => {
+        activeQuery = query
+        const revision = ++queryRevision
         set({ loading: true, error: null })
         try {
             const events = await window.electronAPI.event.query(query)
-            set({ events, loading: false })
+            if (revision === queryRevision) set({ events, loading: false })
         } catch (err) {
-            set({ error: String(err), loading: false })
+            if (revision === queryRevision) set({ error: String(err), loading: false })
         }
     },
 
     createEvent: async (data) => {
         const event = await window.electronAPI.event.create(data)
-        set({ events: [...get().events, event] })
+        if (activeQuery) await get().loadEvents(activeQuery)
+        else set({ events: [...get().events, event] })
         return event
     },
 
     updateEvent: async (id, data) => {
         const event = await window.electronAPI.event.update(id, data)
-        set({ events: get().events.map(e => (e.id === id ? event : e)) })
+        if (activeQuery) await get().loadEvents(activeQuery)
+        else set({ events: get().events.map(e => (e.id === id ? event : e)) })
         return event
     },
 
     removeEvent: async (id) => {
         await window.electronAPI.event.remove(id)
-        set({ events: get().events.filter(e => e.id !== id) })
+        if (activeQuery) await get().loadEvents(activeQuery)
+        else set({ events: get().events.filter(e => e.id !== id && e.recurrence_parent_id !== id) })
     },
 
     getEventsForDate: (date) => {
@@ -56,3 +64,7 @@ export const useEventStore = create<EventStore>((set, get) => ({
         })
     }
 }))
+
+window.electronAPI.on('schedule:changed', () => {
+    if (activeQuery) void useEventStore.getState().loadEvents(activeQuery)
+})

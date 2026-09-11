@@ -13,6 +13,7 @@ const isCardMode = new URLSearchParams(window.location.search).get('mode') === '
 
 // 卡片模式：页面 body 必须透明，否则会盖住透明窗口背景
 if (isCardMode) {
+    document.documentElement.classList.add('card-mode')
     document.body.classList.add('card-mode-body')
 }
 

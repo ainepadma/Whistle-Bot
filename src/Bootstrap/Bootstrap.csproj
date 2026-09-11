@@ -10,7 +10,9 @@
     <Product>小鹞 WhistleBot</Product>
     <Description>开发人员：Ainepadma</Description>
     <AssemblyTitle>小鹞 WhistleBot</AssemblyTitle>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
+    <InformationalVersion>Preview v1.3.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
     <Nullable>disable</Nullable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>

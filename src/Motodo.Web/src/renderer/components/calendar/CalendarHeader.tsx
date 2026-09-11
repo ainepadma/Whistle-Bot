@@ -47,7 +47,7 @@ export default function CalendarHeader(): JSX.Element {
 
     return (
         <div
-            className="flex min-h-14 items-center justify-between gap-3 border-b border-zinc-200
+            className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-zinc-200
              bg-white/80 px-4 py-2 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/70"
         >
             {/* 左侧：标题 + 周数徽标 */}
@@ -67,7 +67,7 @@ export default function CalendarHeader(): JSX.Element {
             </div>
 
             {/* 右侧：日期导航 + 视图切换 */}
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
                 <div className="flex items-center gap-1.5">
                     <button
                         onClick={goPrev}

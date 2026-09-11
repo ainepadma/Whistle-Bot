@@ -1,70 +1,78 @@
 import { useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import type { Event } from '@shared/types/event'
-import { useSemesterStore } from '@/stores/semester.store'
-import { useCourseStore } from '@/stores/course.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useSchedulePopupStore } from '@/stores/schedule-popup.store'
 import { buildCourseInstances } from '@shared/utils/course-calendar'
 import { formatClock } from '@/utils/format'
-import Icon from '@/components/ui/Icons'
 
 interface TodayCardProps {
-    onClose: () => void
     onCreate: () => void
 }
 
 /** 今日小卡片：紧凑展示今日日程，不做大号日期/时钟提示 */
-export default function TodayCard({ onClose, onCreate }: TodayCardProps): JSX.Element {
+export default function TodayCard({ onCreate }: TodayCardProps): JSX.Element {
     const [now, setNow] = useState(() => dayjs())
     const [events, setEvents] = useState<Event[]>([])
     const [courseItems, setCourseItems] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
-    const [reloadKey, setReloadKey] = useState(0)
+    const [error, setError] = useState<string | null>(null)
     const timeFormat = useSettingsStore((s) => s.timeFormat)
     const openDetailPopup = useSchedulePopupStore((s) => s.openDetail)
 
     useEffect(() => {
-        const timer = window.setInterval(() => setNow(dayjs()), 60_000)
-        return () => window.clearInterval(timer)
-    }, [])
-
-    useEffect(() => {
         let mounted = true
+        let revision = 0
+        let loadedDate = dayjs().format('YYYY-MM-DD')
         const load = async () => {
+            const request = ++revision
             setLoading(true)
+            setError(null)
+            const today = dayjs()
+            loadedDate = today.format('YYYY-MM-DD')
+            setNow(today)
             const range = {
-                start: dayjs().startOf('day').toISOString(),
-                end: dayjs().endOf('day').add(1, 'day').toISOString()
+                start: today.startOf('day').toISOString(),
+                end: today.startOf('day').add(1, 'day').toISOString()
             }
             try {
-                const [evts] = await Promise.all([
+                const [evts, courses] = await Promise.all([
                     window.electronAPI.event.query(range),
                     (async () => {
-                        const semesterStore = useSemesterStore.getState()
-                        if (semesterStore.semesters.length === 0 && !semesterStore.loading) {
-                            await semesterStore.loadSemesters()
-                        }
-                        const active = useSemesterStore.getState().activeSemester
-                        if (!active) return
-                        await useCourseStore.getState().loadBySemester(active.id)
-                        const courses = useCourseStore.getState().courses
-                        setCourseItems(buildCourseInstances(active, courses, range))
+                        const active = await window.electronAPI.semester.getActive()
+                        if (!active) return []
+                        const items = await window.electronAPI.course.listBySemester(active.id)
+                        return buildCourseInstances(active, items, range)
                     })()
                 ])
-                if (mounted) setEvents(evts)
+                if (mounted && request === revision) {
+                    setEvents(evts)
+                    setCourseItems(courses)
+                }
+            } catch (err) {
+                if (mounted && request === revision) setError(String(err))
             } finally {
-                if (mounted) setLoading(false)
+                if (mounted && request === revision) setLoading(false)
             }
         }
         void load()
+        const unsubscribe = window.electronAPI.on('schedule:changed', () => void load())
+        const timer = window.setInterval(() => {
+            const current = dayjs()
+            setNow(current)
+            if (current.format('YYYY-MM-DD') !== loadedDate) void load()
+        }, 60_000)
         return () => {
             mounted = false
+            revision++
+            unsubscribe()
+            window.clearInterval(timer)
         }
     }, [])
 
     const { allDay, timed } = useMemo(() => {
-        const all = [...events, ...courseItems].filter((e) => dayjs(e.start_at).isSame(now, 'day'))
+        const all = [...events, ...courseItems].filter((e) =>
+            dayjs(e.start_at).isBefore(now.startOf('day').add(1, 'day')) && dayjs(e.end_at).isAfter(now.startOf('day')))
         return {
             allDay: all.filter((e) => e.is_all_day).sort((a, b) => a.title.localeCompare(b.title)),
             timed: all
@@ -79,26 +87,18 @@ export default function TodayCard({ onClose, onCreate }: TodayCardProps): JSX.El
 
     return (
         <div
-            className="mx-3 mb-3 max-h-[calc(100vh-3.75rem)] overflow-y-auto rounded-xl border border-slate-200/90 bg-white p-3 shadow-[0_2px_8px_rgba(15,23,42,0.04)] dark:border-zinc-800 dark:bg-zinc-950"
+            className="desktop-card-panel ui-card flex flex-col overflow-hidden"
         >
-            {/* 顶部：小标题 + 收起 */}
-            <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
+            <div className="mb-3 flex shrink-0 items-center justify-between">
+                <span className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
                     {now.format('M月D日 HH:mm')}
                 </span>
-                <button
-                    onClick={onClose}
-                    aria-label="收起卡片"
-                    title="收起卡片"
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-400
-                     transition-colors hover:bg-zinc-100 hover:text-zinc-700
-                     dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                >
-                    <Icon name="close" className="h-3.5 w-3.5" />
-                </button>
+                <span className="text-xs text-zinc-400">当天安排</span>
             </div>
 
+            {error && <p role="alert" className="mb-2 text-xs text-red-500">加载失败：{error}</p>}
             {/* 今日日程 */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {loading ? (
                 <div className="flex h-28 items-center justify-center">
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-950
@@ -131,8 +131,9 @@ export default function TodayCard({ onClose, onCreate }: TodayCardProps): JSX.El
                 </div>
             )}
 
-            {/* 底部：统计 + 操作 */}
-            <div className="mt-2.5 flex items-center justify-between border-t border-zinc-100 pt-2 dark:border-zinc-800">
+            </div>
+            {/* 日程列表单独滚动，统计与新建按钮始终可见。 */}
+            <div className="mt-3 flex shrink-0 items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
                 <p className="text-[10px] text-zinc-400">
                     {total} 项 · 待办 {completedTodos}/{todos.length}
                 </p>

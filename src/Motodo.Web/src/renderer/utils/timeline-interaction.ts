@@ -76,7 +76,7 @@ export function shiftEventByDays(
 
 /** 日程是否允许拖拽/缩放：课程与重复日程保持只读 */
 export function canEditSchedule(event: Event): boolean {
-    return !event.is_course && !event.rrule_str
+    return !event.is_course && !event.rrule_str && !event.recurrence_parent_id
 }
 
 /** 筛选某一天时间窗口内的日程（含课程，节假日课程自动隐藏） */

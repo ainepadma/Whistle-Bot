@@ -1,14 +1,18 @@
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $dist = Join-Path $root 'dist'
-$petOut = Join-Path $dist 'Pet'
-$bootOut = Join-Path $dist 'Bootstrap'
-$pkg = Join-Path $dist 'DesktopPet-win-x64'
-
-Remove-Item $petOut, $bootOut, $pkg -Recurse -Force -ErrorAction SilentlyContinue
+$project = [xml](Get-Content -LiteralPath (Join-Path $root 'src\PetApp\PetApp.csproj') -Raw)
+$version = [string]$project.Project.PropertyGroup.Version
+$packageName = "DesktopPet-Preview-v$version-win-x64"
+# Build in a fresh directory; previous packages and user files are never cleaned up.
+$stage = Join-Path $dist ('.build-' + [guid]::NewGuid().ToString('N'))
+$petOut = Join-Path $stage 'Pet'
+$bootOut = Join-Path $stage 'Bootstrap'
+$webOut = Join-Path $stage 'Web'
+$pkg = Join-Path $dist $packageName
 
 Write-Host '== Building schedule WebView UI =='
-npm --prefix (Join-Path $root 'src\Motodo.Web') run build
+npm --prefix (Join-Path $root 'src\Motodo.Web') run build -- --outDir $webOut --emptyOutDir false
 if ($LASTEXITCODE -ne 0) { throw 'Schedule web build failed' }
 
 Write-Host '== Publishing PetApp (.NET 9 framework-dependent single-file) =='
@@ -21,16 +25,22 @@ dotnet build (Join-Path $root 'src\Bootstrap') -c Release -o $bootOut
 if ($LASTEXITCODE -ne 0) { throw 'Bootstrap build failed' }
 
 New-Item -ItemType Directory -Force -Path $pkg | Out-Null
-Copy-Item (Join-Path $petOut '*') $pkg -Recurse -Force
+Get-ChildItem -LiteralPath $petOut -File | Where-Object { $_.Extension -notin '.xml', '.pdb' } |
+    Copy-Item -Destination $pkg -Force
+$webRoot = Join-Path $pkg 'wwwroot'
+New-Item -ItemType Directory -Force -Path $webRoot | Out-Null
+Get-ChildItem -LiteralPath (Join-Path $petOut 'wwwroot') | Where-Object { $_.Name -ne 'motodo' } |
+    Copy-Item -Destination $webRoot -Recurse -Force
+$scheduleRoot = Join-Path $webRoot 'motodo'
+New-Item -ItemType Directory -Force -Path $scheduleRoot | Out-Null
+Copy-Item (Join-Path $webOut '*') $scheduleRoot -Recurse -Force
 Copy-Item (Join-Path $bootOut 'Bootstrap.exe') $pkg -Force
-# drop intellisense docs / debug symbols to keep the package tiny
-Get-ChildItem $pkg -Recurse -Include *.xml, *.pdb | Remove-Item -Force
+Copy-Item -LiteralPath (Join-Path $root 'README.md'), (Join-Path $root 'RELEASE.md') -Destination $pkg -Force
 
 $manifest = Join-Path $root 'version.yml'
 Copy-Item $manifest (Join-Path $dist 'version.yml') -Force
 
-$zip = Join-Path $dist 'DesktopPet-win-x64.zip'
-Remove-Item $zip -Force -ErrorAction SilentlyContinue
+$zip = Join-Path $dist ($packageName + '.zip')
 Compress-Archive -Path (Join-Path $pkg '*') -DestinationPath $zip -Force
 
 Write-Host ''

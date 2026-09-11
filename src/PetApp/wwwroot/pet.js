@@ -16,6 +16,46 @@
   let target = DATA.EXPRESSIONS[0];
   let morph = 1, velocity = 0, last = performance.now(), blinkStart = 0, gazeX = 0, gazeY = 0;
   let tooltipTimer = 0;
+  let kiteAnimation = null, kitePending = false, kiteRequestTimer = 0, kiteRequestRevision = 0;
+  let pendingKiteKind = 'hexagonal';
+  let singleClickTimer = 0, doubleClickMs = 500;
+  const bodyPath = document.querySelector('#shape-body-path');
+  const bodyLength = bodyPath.getTotalLength();
+  const bodyOutline = Array.from({ length: 64 }, (_, index) => bodyPath.getPointAtLength(bodyLength * index / 64));
+  let lastRegionTime = -Infinity, lastRegion = '';
+
+  function reportHitRegion(now, force = false) {
+    if (!window.chrome || !chrome.webview || (!force && now - lastRegionTime < 50)) return;
+    lastRegionTime = now;
+    const matrix = bodyPath.getScreenCTM();
+    if (!matrix || !innerWidth || !innerHeight) return;
+    let polygon = bodyOutline.map(point => {
+      const mapped = point.matrixTransform(matrix);
+      return [Math.round(mapped.x), Math.round(mapped.y)];
+    });
+    // Each note contributes its complete flight envelope so native/browser timing
+    // cannot clip a moving glyph. Tooltips remain included through their fade-out.
+    const rects = Array.from(stage.querySelectorAll('.pet-note'), note => JSON.parse(note.dataset.hitRegion));
+    const kiteRegion = kiteAnimation?.hitRegion();
+    if (kiteRegion?.polygon.length >= 3) {
+      polygon = kiteRegion.polygon.map(([x,y]) => [Math.round(x),Math.round(y)]);
+      rects.push(...kiteRegion.rects);
+    }
+    if (!tooltip.hidden) {
+      const rect = tooltip.getBoundingClientRect();
+      rects.push([Math.floor(rect.left - 2), Math.floor(rect.top - 2), Math.ceil(rect.width + 4), Math.ceil(rect.height + 4)]);
+    }
+    const message = { type: 'pet-region', width: innerWidth, height: innerHeight, polygon, rects };
+    if (kiteRegion?.polygons?.length) {
+      message.animation = true;
+      message.polygons = kiteRegion.polygons;
+    }
+    const signature = JSON.stringify(message);
+    if (force || signature !== lastRegion) {
+      lastRegion = signature;
+      post(message);
+    }
+  }
 
   const rings = () => current.map((ring, e) => ring.map((p, i) =>
     [p[0] + (target[e][i][0] - p[0]) * clamp(morph, 0, 1), p[1] + (target[e][i][1] - p[1]) * clamp(morph, 0, 1)]));
@@ -32,6 +72,7 @@
   };
   const blink = () => { blinkStart = performance.now(); };
   function frame(now) {
+    kiteAnimation?.render(now);
     const dt = Math.min((now - last) / 1000, .1);
     last = now;
     velocity += (-14 * velocity - 49 * (morph - 1)) * dt;
@@ -50,6 +91,7 @@
       eyeEls[i].setAttribute('transform', `translate(${x} ${y}) scale(${clamp(perspective, .02, 2.4)} ${bs}) translate(${-c[0]} ${-c[1]})`);
       eyeEls[i].style.opacity = depth > .02 ? '1' : '0';
     });
+    reportHitRegion(now);
     requestAnimationFrame(frame);
   }
 
@@ -105,6 +147,7 @@
     }, 2800);
   }
   function setBehavior(name) {
+    if (kitePending || kiteAnimation?.active) return;
     if (behavior === name) {
       if (name === 'interaction') bounceOnce();
       return;
@@ -131,6 +174,49 @@
   }
   function post(msg) { if (window.chrome && chrome.webview) chrome.webview.postMessage(msg); }
 
+  function finishKite() {
+    kiteRequestRevision++;
+    kitePending = false;
+    clearTimeout(kiteRequestTimer);
+    post({ type: 'kite-mode', active: false });
+    lastInteraction = performance.now();
+    behavior = '';
+    setBehavior(focusOverride || 'standby');
+    reportHitRegion(performance.now(), true);
+  }
+  function beginKite(revision = kiteRequestRevision) {
+    if (!kitePending || revision !== kiteRequestRevision) return;
+    clearTimeout(kiteRequestTimer);
+    kitePending = false;
+    clearTimeout(stateTimer); clearTimeout(exprTimer); clearTimeout(bounceTimer);
+    try {
+      kiteAnimation ||= new window.BanyaoKiteAnimation({ stage, bot, onFinish: finishKite });
+      if (!kiteAnimation.start(performance.now(), pendingKiteKind)) { finishKite(); return; }
+      showTooltip('哨口汇风 · ' + kiteAnimation.model.label);
+      reportHitRegion(performance.now(), true);
+    } catch {
+      // A missing/unsupported renderer must not leave a large, invisible native window.
+      kiteAnimation?.finish();
+      finishKite();
+    }
+  }
+  function startKite() {
+    clearTimeout(singleClickTimer);
+    if (kitePending || kiteAnimation?.active || behavior === 'despawn' || !window.BanyaoKiteAnimation) return;
+    pendingKiteKind = Math.random() < .5 ? 'hexagonal' : 'nineStar';
+    kitePending = true;
+    const revision = ++kiteRequestRevision;
+    lastInteraction = performance.now();
+    if (window.chrome && chrome.webview) {
+      post({ type: 'kite-mode', active: true });
+      kiteRequestTimer = setTimeout(() => { if (kitePending && revision === kiteRequestRevision) finishKite(); }, 1500);
+    } else beginKite();
+  }
+  function cancelKite() {
+    if (kiteAnimation?.active) kiteAnimation.finish();
+    else if (kitePending) finishKite();
+  }
+
   let requestedPetContainerSize = 200;
   function applyModelSize(size) {
     requestedPetContainerSize = size || requestedPetContainerSize;
@@ -144,7 +230,10 @@
     const model = Math.max(100, Math.min(requested, availableWidth, availableHeight));
     document.documentElement.style.setProperty('--pet-size', Math.floor(model) + 'px');
   }
-  window.addEventListener('resize', () => applyModelSize(requestedPetContainerSize));
+  window.addEventListener('resize', () => {
+    applyModelSize(requestedPetContainerSize);
+    reportHitRegion(performance.now(), true);
+  });
   function applyColor(color) {
     if (color) document.documentElement.style.setProperty('--pet-color', color);
   }
@@ -164,6 +253,13 @@
     const rot = (Math.random() * 2 - 1) * 28;
     const dur = .8 + Math.random() * .6;
     const note = document.createElement('span');
+    const padding = size * 1.6 + 6;
+    note.dataset.hitRegion = JSON.stringify([
+      Math.floor(sr.left + x - Math.abs(drift) - padding),
+      Math.floor(sr.top + y - rise - padding),
+      Math.ceil(Math.abs(drift) * 2 + padding * 2),
+      Math.ceil(rise + padding * 2 + 10)
+    ]);
     note.className = 'pet-note ' + (Math.random() < .45 ? 'sway' : 'pop');
     note.textContent = glyph;
     note.style.cssText = 'left:' + x.toFixed(1) + 'px;top:' + y.toFixed(1) + 'px;' +
@@ -171,6 +267,7 @@
       '--drift:' + drift.toFixed(1) + 'px;--rise:' + rise.toFixed(1) + 'px;' +
       '--rot:' + rot.toFixed(1) + 'deg;animation-duration:' + dur.toFixed(2) + 's';
     stage.appendChild(note);
+    reportHitRegion(performance.now(), true);
     post({ type: 'note-spawn' });
     setTimeout(() => note.remove(), dur * 1000 + 150);
   }
@@ -186,6 +283,7 @@
       : running && (mode === 'short-break' || mode === 'long-break') ? 'break'
       : '';
     focusOverride = desired;
+    if (kitePending || kiteAnimation?.active) return;
     if (desired) {
       if (behavior !== desired) setBehavior(desired);
     } else if (behavior === 'focus' || behavior === 'break') {
@@ -197,12 +295,23 @@
   if (window.chrome && chrome.webview) {
     chrome.webview.addEventListener('message', e => {
       const d = e.data;
-      if (d.type === 'systemIdle') {
-        if (focusOverride) return;
+      if (d.type === 'interaction-settings') {
+        doubleClickMs = clamp(Number(d.doubleClickMs) || 500, 100, 2000);
+      } else if (d.type === 'kite-mode') {
+        if (d.active && kitePending) {
+          const revision = kiteRequestRevision;
+          requestAnimationFrame(() => requestAnimationFrame(() => beginKite(revision)));
+        }
+        else if (!d.active) cancelKite();
+        else if (!kiteAnimation?.active) post({ type: 'kite-mode', active: false });
+      } else if (d.type === 'request-region') {
+        reportHitRegion(performance.now(), true);
+      } else if (d.type === 'systemIdle') {
+        if (focusOverride || kitePending || kiteAnimation?.active) return;
         if (d.seconds > 300 && (behavior === 'standby' || behavior === 'noInteraction')) setBehavior('systemIdle');
         else if (d.seconds < 5 && behavior === 'systemIdle') setBehavior('standby');
       } else if (d.type === 'typing') {
-        if (focusOverride) return;
+        if (focusOverride || kitePending || kiteAnimation?.active) return;
         lastTyping = performance.now();
         if (behavior !== 'systemIdle' && behavior !== 'despawn') {
           setBehavior('typing');
@@ -215,10 +324,12 @@
       } else if (d.type === 'toast') {
         showTooltip(d.text || '');
       } else if (d.type === 'size') {
+        cancelKite();
         applyModelSize(d.size);
       } else if (d.type === 'set-color') {
         applyColor(d.color || '#2f86ed');
       } else if (d.type === 'quit') {
+        cancelKite();
         setBehavior('despawn');
       }
     });
@@ -227,43 +338,62 @@
   function interact() {
     lastInteraction = performance.now();
     interactionUntil = performance.now() + 6000;
-    if (behavior !== 'despawn' && behavior !== 'systemIdle') setBehavior('interaction');
+    if (!kitePending && !kiteAnimation?.active && behavior !== 'despawn' && behavior !== 'systemIdle') setBehavior('interaction');
   }
 
   // no-interaction watchdog
   setInterval(() => {
-    if (focusOverride) return;
+    if (focusOverride || kitePending || kiteAnimation?.active) return;
     if (behavior === 'systemIdle' || behavior === 'despawn' || behavior === 'appear') return;
     if (performance.now() - lastInteraction > 120000 && behavior !== 'noInteraction') setBehavior('noInteraction');
     if (behavior === 'noInteraction' && performance.now() - lastInteraction < 120000) setBehavior('standby');
   }, 5000);
   setInterval(() => {
-    if (focusOverride) return;
+    if (focusOverride || kitePending || kiteAnimation?.active) return;
     if (behavior === 'typing' && performance.now() - lastTyping > 5000)
       setBehavior(interactionUntil > performance.now() ? 'interaction' : 'standby');
   }, 3000);
 
   // left click / drag on the model; right click opens the menu
-  let downX = 0, downY = 0, downT = 0, dragging = false, suppressClick = false;
+  let downX = 0, downY = 0, downT = -1, dragging = false, suppressClick = false, lastGestureDragged = false;
+  let previousModelClick = false, lastModelClick = false;
   stage.addEventListener('pointerdown', e => {
-    if (e.button === 0) { downX = e.clientX; downY = e.clientY; downT = performance.now(); dragging = false; blink(); }
+    if (e.button === 0 && e.target.closest('#bot, .kite-canvas')) {
+      downX = e.clientX; downY = e.clientY; downT = performance.now(); dragging = false; blink();
+      stage.setPointerCapture?.(e.pointerId);
+    }
   });
   document.addEventListener('pointermove', e => {
-    if (downT && !dragging) {
+    if (downT >= 0 && !dragging) {
       const dx = e.clientX - downX, dy = e.clientY - downY;
-      if (dx * dx + dy * dy > 36) dragging = true;
+      if (dx * dx + dy * dy > 36) { dragging = true; clearTimeout(singleClickTimer); }
     }
     if (dragging) post({ type: 'drag', dx: e.movementX, dy: e.movementY });
   });
   document.addEventListener('pointerup', e => {
-    if (downT && !dragging && e.button === 0) {
-      if (!suppressClick) interact();
+    lastGestureDragged = dragging;
+    previousModelClick = lastModelClick;
+    lastModelClick = downT >= 0 && !dragging && !suppressClick && e.button === 0;
+    if (downT >= 0 && !dragging && e.button === 0) {
+      // Keep the first click still until the OS double-click interval expires.
+      clearTimeout(singleClickTimer);
+      if (!suppressClick && !kiteAnimation?.active) singleClickTimer = setTimeout(interact, doubleClickMs + 30);
     }
-    downT = 0; dragging = false; suppressClick = false;
+    downT = -1; dragging = false; suppressClick = false;
+    if (stage.hasPointerCapture?.(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+  });
+  document.addEventListener('pointercancel', () => { downT = -1; dragging = false; clearTimeout(singleClickTimer); });
+  stage.addEventListener('dblclick', e => {
+    // Pointer capture can retarget the click to stage; both presses still had to start on the model.
+    if (e.button !== 0 || lastGestureDragged || !previousModelClick || !lastModelClick) return;
+    e.preventDefault();
+    startKite();
   });
   stage.addEventListener('contextmenu', e => {
     e.preventDefault();
     suppressClick = true;
+    clearTimeout(singleClickTimer);
+    cancelKite();
     post({ type: 'menu-open', x: e.clientX, y: e.clientY, iw: innerWidth, ih: innerHeight });
   });
 
@@ -275,6 +405,8 @@
     gazeY = clamp((e.clientY - box.top) / box.height * 2 - 1, -.6, .6) * 12;
   });
   stage.addEventListener('pointerleave', () => { gazeX = 0; gazeY = 0; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelKite(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelKite(); });
 
   setInterval(() => { if (Math.random() < .5) blink(); }, 4200);
 
@@ -300,5 +432,6 @@
   } else {
     setBehavior('appear');
   }
+  post({ type: 'interaction-settings' });
   requestAnimationFrame(frame);
 })();

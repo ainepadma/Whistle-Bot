@@ -72,8 +72,13 @@ internal static class NativeInput
         var info = new LastInputInfo { CbSize = (uint)Marshal.SizeOf<LastInputInfo>() };
         if (!GetLastInputInfo(ref info))
             return 0;
-        return (uint)((GetTickCount64() - info.DwTime) / 1000ul);
+        return IdleSeconds(GetTickCount64(), info.DwTime);
     }
+
+    // LASTINPUTINFO stores the low 32 bits of the boot tick count. Subtract in
+    // that same wrapping domain, including when the machine passes 49.7 days.
+    internal static uint IdleSeconds(ulong now, uint lastInput) =>
+        unchecked((uint)now - lastInput) / 1000u;
 
     public static void StartKeyboardHook()
     {

@@ -1,3 +1,4 @@
+using Microsoft.Win32;
 using PetApp.Schedule;
 
 namespace PetApp.DesktopCards;
@@ -9,12 +10,21 @@ internal sealed class CardHostManager : IDisposable
     private readonly IScheduleDesktopHost _desktop;
     private readonly CardLayoutStore _layouts = new();
     private readonly Dictionary<string, CardForm> _forms = new(StringComparer.OrdinalIgnoreCase);
+    private readonly CardWindowState _state = new();
+    private readonly SynchronizationContext? _uiContext;
+    private readonly Dictionary<string, PendingSwitch> _pendingSwitches = new();
     private bool _restoring;
+    private bool _applyingBounds;
+    private bool _disposed;
+
+    private sealed record PendingSwitch(string Target, CardForm Form, EventHandler Handler, bool TargetWasVisible);
 
     public CardHostManager(ScheduleStore store, IScheduleDesktopHost desktop)
     {
         _store = store;
         _desktop = desktop;
+        _uiContext = SynchronizationContext.Current;
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
 
     public void RestorePinnedCards()
@@ -33,10 +43,12 @@ internal sealed class CardHostManager : IDisposable
     public void Show(string kind, bool activate = true)
     {
         kind = Normalize(kind);
+        CancelPendingSwitches(kind);
         var layout = _layouts.Get(kind);
         var form = GetOrCreate(kind, layout);
         Apply(form, layout);
         layout.Visible = true;
+        _state.Request(kind, true);
         _layouts.Save(layout);
         form.Reveal(activate);
 
@@ -49,24 +61,33 @@ internal sealed class CardHostManager : IDisposable
         fromKind = Normalize(fromKind);
         toKind = Normalize(toKind);
         if (fromKind == toKind) { Show(toKind); return; }
+        if (!IsVisible(fromKind)) { Show(toKind); return; }
 
         var sourceLayout = _layouts.Get(fromKind);
         if (sourceLayout.Pinned) { Show(toKind); return; }
+
+        CancelPendingSwitches(fromKind);
+        CancelPendingSwitches(toKind);
 
         var sourceForm = _forms.TryGetValue(fromKind, out var existingSource) && existingSource.Visible ? existingSource : null;
         var location = sourceForm != null ? sourceForm.Location : new Point(sourceLayout.X, sourceLayout.Y);
         var targetLayout = _layouts.Get(toKind);
         if (targetLayout.Pinned) { Show(toKind); return; }
+        var targetWasVisible = IsVisible(toKind);
         targetLayout.X = location.X;
         targetLayout.Y = location.Y;
         targetLayout.Visible = true;
         _layouts.Save(targetLayout);
         var targetForm = GetOrCreate(toKind, targetLayout);
         Apply(targetForm, targetLayout);
+        var sourceRevision = _state.Request(fromKind, true);
+        var targetRevision = _state.Request(toKind, true);
 
         void ConcealSource()
         {
+            if (!_state.IsCurrent(fromKind, sourceRevision) || !_state.IsCurrent(toKind, targetRevision)) return;
             sourceLayout.Visible = false;
+            _state.Request(fromKind, false);
             _layouts.Save(sourceLayout);
             sourceForm?.Conceal();
             PublishState(fromKind);
@@ -79,8 +100,10 @@ internal sealed class CardHostManager : IDisposable
             revealSource = (_, _) =>
             {
                 targetForm.ContentReady -= revealSource;
+                _pendingSwitches.Remove(fromKind);
                 ConcealSource();
             };
+            _pendingSwitches[fromKind] = new PendingSwitch(toKind, targetForm, revealSource, targetWasVisible);
             targetForm.ContentReady += revealSource;
         }
         targetForm.Reveal();
@@ -89,14 +112,21 @@ internal sealed class CardHostManager : IDisposable
     public void Hide(string kind)
     {
         kind = Normalize(kind);
+        CancelPendingSwitches(kind);
+        Conceal(kind);
+    }
+
+    private void Conceal(string kind)
+    {
         var layout = _layouts.Get(kind);
         layout.Visible = false;
+        _state.Request(kind, false);
         _layouts.Save(layout);
         if (_forms.TryGetValue(kind, out var form) && form.Visible) form.Conceal();
         PublishState(kind);
     }
 
-    public bool IsVisible(string kind) => _forms.TryGetValue(Normalize(kind), out var form) && form.Visible;
+    public bool IsVisible(string kind) => _state.IsVisible(Normalize(kind));
 
     public CardPresentation Presentation(string kind)
     {
@@ -108,6 +138,7 @@ internal sealed class CardHostManager : IDisposable
     public void TogglePinned(string kind)
     {
         kind = Normalize(kind);
+        CancelPendingSwitches(kind);
         var layout = _layouts.Get(kind);
         layout.Pinned = !layout.Pinned;
         _layouts.Save(layout);
@@ -119,18 +150,16 @@ internal sealed class CardHostManager : IDisposable
         kind = Normalize(kind);
         var layout = _layouts.Get(kind);
         if (layout.Pinned) return;
-        if (_forms.TryGetValue(kind, out var form) && form.Visible) form.BeginNativeDrag();
+        if (_forms.TryGetValue(kind, out var form) && IsVisible(kind)) form.BeginNativeDrag();
     }
     public void Move(string kind, int deltaX, int deltaY)
     {
         kind = Normalize(kind);
-        if (!_forms.TryGetValue(kind, out var form) || !form.Visible) return;
+        if (!_forms.TryGetValue(kind, out var form) || !IsVisible(kind)) return;
         var layout = _layouts.Get(kind);
         if (layout.Pinned) return;
-        var workArea = Screen.FromRectangle(form.Bounds).WorkingArea;
-        var x = Math.Clamp(form.Left + DpiLayout.ToDevice(form, deltaX), workArea.Left, Math.Max(workArea.Left, workArea.Right - form.Width));
-        var y = Math.Clamp(form.Top + DpiLayout.ToDevice(form, deltaY), workArea.Top, Math.Max(workArea.Top, workArea.Bottom - form.Height));
-        form.Location = new Point(x, y);
+        var location = new Point(form.Left + DpiLayout.ToDevice(form, deltaX), form.Top + DpiLayout.ToDevice(form, deltaY));
+        Fit(form, layout, location, Screen.FromRectangle(new Rectangle(location, form.Size)));
         layout.X = form.Left;
         layout.Y = form.Top;
         _layouts.Save(layout);
@@ -139,45 +168,37 @@ internal sealed class CardHostManager : IDisposable
     public void Resize(string kind, int width, int height)
     {
         kind = Normalize(kind);
-        if (!_forms.TryGetValue(kind, out var form) || !form.Visible) return;
+        if (!_forms.TryGetValue(kind, out var form) || !IsVisible(kind)) return;
 
-        var logical = ClampLogical(kind, new Size(width, height));
-        var workArea = Screen.FromRectangle(form.Bounds).WorkingArea;
-        // Never grow past the usable monitor area. The React modal then falls
-        // back to its hidden-scroll viewport on very small displays.
-        var available = DpiLayout.ToLogical(form, new Size(
-            Math.Max(form.MinimumSize.Width, workArea.Width - 32),
-            Math.Max(form.MinimumSize.Height, workArea.Height - 32)));
-        logical = new Size(Math.Min(logical.Width, available.Width), Math.Min(logical.Height, available.Height));
-
-        var next = DpiLayout.ToDevice(form, logical);
-        if (form.Size == next) return;
-        form.Size = next;
-        form.Location = new Point(
-            Math.Clamp(form.Left, workArea.Left, Math.Max(workArea.Left, workArea.Right - form.Width)),
-            Math.Clamp(form.Top, workArea.Top, Math.Max(workArea.Top, workArea.Bottom - form.Height)));
+        // Older WebViews may still request content-driven resizing. Keep the tier stable.
+        var logical = CardWindowLayout.PreferredSize(kind);
         var layout = _layouts.Get(kind);
+        var unchanged = layout.Width == logical.Width && layout.Height == logical.Height;
         layout.Width = logical.Width;
         layout.Height = logical.Height;
+        Fit(form, layout, form.Location, Screen.FromRectangle(form.Bounds));
+        if (unchanged && layout.X == form.Left && layout.Y == form.Top) return;
         layout.X = form.Left;
         layout.Y = form.Top;
         _layouts.Save(layout);
     }
     public void RecordBounds(CardForm form)
     {
-        if (_restoring || !form.Visible) return;
+        if (_restoring || !IsVisible(form.Kind)) return;
         var layout = _layouts.Get(form.Kind);
+        Fit(form, layout, form.Location, Screen.FromRectangle(form.Bounds));
         layout.X = form.Left;
         layout.Y = form.Top;
-        var logical = DpiLayout.ToLogical(form, form.Size);
-        layout.Width = logical.Width;
-        layout.Height = logical.Height;
         layout.Visible = true;
         _layouts.Save(layout);
     }
 
     public void Dispose()
     {
+        _disposed = true;
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        foreach (var pending in _pendingSwitches.Values) pending.Form.ContentReady -= pending.Handler;
+        _pendingSwitches.Clear();
         foreach (var form in _forms.Values) form.Dispose();
         _forms.Clear();
     }
@@ -187,32 +208,53 @@ internal sealed class CardHostManager : IDisposable
         if (_forms.TryGetValue(kind, out var form)) return form;
         form = new CardForm(kind, _store, _desktop, this);
         _forms.Add(kind, form);
-        Apply(form, layout);
         return form;
     }
 
-    private static void Apply(CardForm form, CardLayout layout)
+    private void Apply(CardForm form, CardLayout layout)
     {
-        var logical = ClampLogical(form.Kind, new Size(layout.Width, layout.Height));
-        // Before the first handle is created WinForms performs the initial DPI
-        // autoscale itself. Subsequent shows must convert the persisted CSS size.
-        form.Size = form.IsHandleCreated ? DpiLayout.ToDevice(form, logical) : logical;
         form.TopMost = layout.AlwaysOnTop;
-        var workArea = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1280, 720);
-        var x = layout.X == int.MinValue ? workArea.Right - form.Width - 28 : layout.X;
-        var y = layout.Y == int.MinValue ? workArea.Bottom - form.Height - 96 : layout.Y;
-        form.Location = new Point(
-            Math.Clamp(x, workArea.Left, Math.Max(workArea.Left, workArea.Right - form.Width)),
-            Math.Clamp(y, workArea.Top, Math.Max(workArea.Top, workArea.Bottom - form.Height)));
+        Point? location = layout.X == int.MinValue || layout.Y == int.MinValue ? null : new Point(layout.X, layout.Y);
+        var screen = location.HasValue ? Screen.FromPoint(location.Value) : Screen.PrimaryScreen ?? Screen.AllScreens[0];
+        Fit(form, layout, location, screen);
     }
 
-    private static Size ClampLogical(string kind, Size size) => kind switch
+    private void Fit(CardForm form, CardLayout layout, Point? location, Screen screen, int? dpi = null)
     {
-        "calendar" => new Size(Math.Clamp(size.Width, 760, 1360), Math.Clamp(size.Height, 520, 960)),
-        "next" => new Size(Math.Clamp(size.Width, 340, 720), Math.Clamp(size.Height, 280, 920)),
-        "manage" => new Size(Math.Clamp(size.Width, 560, 1100), Math.Clamp(size.Height, 480, 920)),
-        _ => new Size(Math.Clamp(size.Width, 340, 720), Math.Clamp(size.Height, 260, 920))
-    };
+        if (_applyingBounds || form.IsDisposed) return;
+        var bounds = CardWindowLayout.Fit(CardWindowLayout.PreferredSize(form.Kind),
+            location, screen.WorkingArea, dpi ?? DpiLayout.ForScreen(screen, form.DeviceDpi));
+        if (form.Bounds == bounds) return;
+        _applyingBounds = true;
+        try { form.Bounds = bounds; }
+        finally { _applyingBounds = false; }
+    }
+
+    public void OnDpiChanged(CardForm form, Rectangle suggestedBounds, int dpi)
+    {
+        Fit(form, _layouts.Get(form.Kind), suggestedBounds.Location, Screen.FromRectangle(suggestedBounds), dpi);
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs args)
+    {
+        _uiContext?.Post(_ =>
+        {
+            if (_disposed) return;
+            foreach (var form in _forms.Values.Where(form => IsVisible(form.Kind)))
+                Fit(form, _layouts.Get(form.Kind), form.Location, Screen.FromRectangle(form.Bounds));
+        }, null);
+    }
+
+    private void CancelPendingSwitches(string kind)
+    {
+        foreach (var entry in _pendingSwitches.Where(entry => entry.Key == kind || entry.Value.Target == kind).ToArray())
+        {
+            _pendingSwitches.Remove(entry.Key);
+            entry.Value.Form.ContentReady -= entry.Value.Handler;
+            // A superseded, newly opened destination must not appear later when its page finishes loading.
+            if (!entry.Value.TargetWasVisible && entry.Value.Target != kind) Conceal(entry.Value.Target);
+        }
+    }
 
     private void PublishState(string kind) => ScheduleEventHub.Instance.Publish("card:state", Presentation(kind));
 

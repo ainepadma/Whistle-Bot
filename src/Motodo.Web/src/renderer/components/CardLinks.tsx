@@ -18,8 +18,8 @@ export default function CardLinks({ current, pinned }: { current: CardKind; pinn
     return (
         <div className="flex items-center gap-0.5">
             {CARDS.map(({ kind, label }) => (
-                <button key={kind} onClick={() => open(kind)} title={pinned ? `添加${label}卡片` : `切换到${label}`}
-                    className={`rounded px-1.5 py-1 text-[10px] transition-colors ${kind === current ? 'bg-zinc-100 font-semibold text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'}`}>
+                <button key={kind} onClick={() => open(kind)} aria-current={kind === current ? 'page' : undefined} title={pinned ? `添加${label}卡片` : `切换到${label}`}
+                    className={`rounded-md px-2 py-1 text-xs transition-colors ${kind === current ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-300' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'}`}>
                     {label}
                 </button>
             ))}

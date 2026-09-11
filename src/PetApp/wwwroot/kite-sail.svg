@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" fill="none">
+  <title>六角板鹞彩绘蒙面</title>
+  <desc>依据 Banyao Kites 六角板鹞参考彩绘简化：奶油中央面、朱红人物团花、金色祥云、上牡丹下竹鸟及左右蝴蝶。仅绘制蒙面，外部透明。</desc>
+  <!-- Flat illustration adapted from blender/hexagonal_kite/textures/painted_sail.png.
+       Original composition retained; fine detail simplified for a small desktop companion. -->
+  <defs>
+    <path id="silhouette" d="M250 0H750V250L1000 500 750 750V1000H250V750L0 500 250 250Z"/>
+    <clipPath id="sail"><use href="#silhouette"/></clipPath>
+    <path id="leaf" d="M0 0Q-16-27 1-47Q17-27 0 0Z" fill="#477953" stroke="#172c22" stroke-width="3"/>
+    <g id="peony" stroke="#8b271c" stroke-width="3" stroke-linejoin="round">
+      <path d="M0-37Q16-53 22-32Q47-35 35-13Q55 0 34 13Q41 36 19 33Q10 56-4 35Q-27 47-29 25Q-52 22-35 3Q-50-18-27-25Q-26-48-8-36Z" fill="#c73b29"/>
+      <path d="M-20-13Q-18-32-4-22Q8-39 16-17Q37-16 22 2Q35 21 12 21Q2 39-10 20Q-31 28-26 9Q-42-3-20-13Z" fill="#e35b37"/>
+      <path d="M-10-4Q-15-21 0-13Q16-23 15-7Q30 5 13 10Q8 26-2 12Q-20 20-16 5Q-28-6-10-4Z" fill="#ef7847"/>
+      <circle r="8" fill="#d7a653" stroke="#9e4b26"/>
+    </g>
+    <g id="upperGarden" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M271 219Q326 142 309 31M294 172Q315 118 374 80M316 127Q359 117 413 40" stroke="#92764b" stroke-width="7"/>
+      <use href="#leaf" transform="translate(308 62) rotate(-49)"/>
+      <use href="#leaf" transform="translate(309 78) rotate(43)"/>
+      <use href="#leaf" transform="translate(311 105) rotate(-72)"/>
+      <use href="#leaf" transform="translate(315 128) rotate(26)"/>
+      <use href="#leaf" transform="translate(300 161) rotate(-55)"/>
+      <use href="#leaf" transform="translate(345 108) rotate(-30)"/>
+      <use href="#leaf" transform="translate(372 79) rotate(43)"/>
+      <use href="#leaf" transform="translate(394 58) rotate(-22) scale(.8)"/>
+      <use href="#peony" transform="translate(291 183) scale(.8)"/>
+      <use href="#peony" transform="translate(351 92) scale(.7)"/>
+      <circle cx="310" cy="40" r="11" fill="#daa95b" stroke="#937448" stroke-width="3"/>
+    </g>
+    <g id="butterfly" stroke="#422719" stroke-width="4" stroke-linejoin="round">
+      <path d="M243 293Q205 333 169 382Q164 441 225 500Q261 466 243 293Z" fill="#cf3e2b"/>
+      <path d="M243 707Q205 667 169 618Q164 559 225 500Q261 534 243 707Z" fill="#cf3e2b"/>
+      <path d="M225 495Q179 422 138 408Q109 410 114 434Q75 434 91 459Q64 475 91 494Q155 520 225 495Z" fill="#df8c3d"/>
+      <path d="M225 505Q179 578 138 592Q109 590 114 566Q75 566 91 541Q64 525 91 506Q155 480 225 505Z" fill="#df8c3d"/>
+      <path d="M225 490Q168 431 151 458Q141 483 199 500Q141 517 151 542Q168 569 225 510Z" fill="#28745b"/>
+      <path d="M191 371 222 468M176 398 211 474M181 621 220 532M196 646 230 536" stroke="#76241d"/>
+      <path d="M122 447 197 490M105 472 196 495M122 553 197 510M105 528 196 505" stroke="#9d582a" stroke-width="3"/>
+      <ellipse cx="231" cy="411" rx="16" ry="27" transform="rotate(-12 231 411)" fill="#183c32"/>
+      <ellipse cx="231" cy="411" rx="9" ry="16" transform="rotate(-12 231 411)" fill="#d5b558" stroke="none"/>
+      <ellipse cx="231" cy="411" rx="4" ry="9" transform="rotate(-12 231 411)" fill="#b73c25" stroke="none"/>
+      <ellipse cx="231" cy="589" rx="16" ry="27" transform="rotate(12 231 589)" fill="#183c32"/>
+      <ellipse cx="231" cy="589" rx="9" ry="16" transform="rotate(12 231 589)" fill="#d5b558" stroke="none"/>
+      <ellipse cx="231" cy="589" rx="4" ry="9" transform="rotate(12 231 589)" fill="#b73c25" stroke="none"/>
+      <g fill="#f1d27c" stroke-width="2">
+        <ellipse cx="138" cy="435" rx="5" ry="8" transform="rotate(-34 138 435)"/>
+        <ellipse cx="112" cy="459" rx="5" ry="8" transform="rotate(-65 112 459)"/>
+        <ellipse cx="138" cy="565" rx="5" ry="8" transform="rotate(34 138 565)"/>
+        <ellipse cx="112" cy="541" rx="5" ry="8" transform="rotate(65 112 541)"/>
+      </g>
+      <path d="M183 497Q205 487 235 496L244 500 235 504Q205 513 183 503Z" fill="#b49a53"/>
+      <circle cx="244" cy="500" r="6" fill="#d7b96b"/>
+    </g>
+    <g id="lowerGarden" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M277 983 286 800M299 984 319 862M285 904 263 857M310 914 349 885" stroke="#72845b" stroke-width="5"/>
+      <path d="M286 819 270 811 279 836 294 821 310 813M282 854 264 843 278 873 297 858 315 850M290 889 270 879 282 908 301 888M317 878 305 866 314 891 331 875M312 922 326 905 341 902M322 909 329 927 347 922" stroke="#629262" stroke-width="4"/>
+      <path d="M322 948Q297 911 280 897Q297 935 306 956M327 949Q310 915 293 912Q305 940 314 959" fill="#b95a2b" stroke="#d1a451" stroke-width="3"/>
+      <path d="M316 951Q339 938 355 955Q351 975 325 975Q304 970 316 951Z" fill="#bd4929" stroke="#dc9a49" stroke-width="3"/>
+      <path d="M321 950Q336 942 350 951L342 963 322 959Z" fill="#386b58"/>
+      <path d="M351 956Q354 941 366 938Q378 943 369 954L356 966Z" fill="#d6a543" stroke="#8c5629" stroke-width="3"/>
+      <path d="M367 939 364 929 360 934 356 929" stroke="#bb4b29" stroke-width="4"/>
+      <circle cx="367" cy="944" r="2.8" fill="#1c2520"/>
+      <path d="M373 946 383 950 372 951M328 974 326 985 336 985M344 971 345 983 354 983" stroke="#d9b261" stroke-width="3"/>
+      <path d="M269 988Q294 976 317 988Q345 975 374 988Q394 973 411 989" stroke="#527047" stroke-width="7"/>
+      <use href="#peony" transform="translate(389 976) scale(.29)"/>
+    </g>
+    <g id="cloud" fill="#e8c47b" stroke="#efcf91" stroke-width="2.5" stroke-linejoin="round">
+      <path d="M-85 9Q-53 5-43-4Q-35-19-20-9Q-6-30 11-13Q31-18 36-3Q55-3 88 3Q61 10 34 9Q22 23 3 14Q-14 23-27 12Q-48 19-85 9Z"/>
+      <path d="M-34 6Q-20-4-14 7Q-3 18 12 8Q26 0 16-7Q8-15 0-7Q-6 0 4 3M32 4 57 4" stroke="#b98140" stroke-width="2.5"/>
+    </g>
+  </defs>
+  <g clip-path="url(#sail)">
+    <use href="#silhouette" fill="#222821"/>
+    <use href="#upperGarden"/>
+    <use href="#upperGarden" transform="translate(1000 0) scale(-1 1)"/>
+    <use href="#lowerGarden"/>
+    <use href="#lowerGarden" transform="translate(1000 0) scale(-1 1)"/>
+    <use href="#butterfly"/>
+    <use href="#butterfly" transform="translate(1000 0) scale(-1 1)"/>
+    <path d="M500 0 750 250V750L500 1000 250 750V250Z" fill="#eed9a9" stroke="#b54a2b" stroke-width="5" stroke-linejoin="round"/>
+    <ellipse cx="500" cy="500" rx="245" ry="260" fill="#c74329"/>
+    <g>
+      <use href="#cloud" transform="translate(443 309) scale(.8)"/>
+      <use href="#cloud" transform="translate(633 365) scale(.75)"/>
+      <use href="#cloud" transform="translate(335 410) scale(.65)"/>
+      <use href="#cloud" transform="translate(658 474) scale(.7)"/>
+      <use href="#cloud" transform="translate(331 571) scale(.62)"/>
+      <use href="#cloud" transform="translate(660 615) scale(.62)"/>
+      <use href="#cloud" transform="translate(413 705) scale(.7)"/>
+    </g>
+    <!-- Five broad, readable robe silhouettes echo the original figure group. -->
+    <g stroke="#674729" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M401 415Q372 434 375 508L350 595Q381 612 415 589L452 601 460 475Q450 433 427 418Z" fill="#487d70"/>
+      <path d="M398 420Q384 450 398 497L380 583 406 568 425 467 438 581 452 589 442 439Z" fill="#d8a84b"/>
+      <path d="M402 359Q414 344 429 363L433 397Q429 419 414 421Q395 410 397 388Z" fill="#ecc48a"/>
+      <path d="M399 374Q385 366 397 352Q406 337 422 347Q441 345 439 365L429 373 424 356 409 359Z" fill="#dfd7b6"/>
+      <path d="M403 392Q411 411 432 393Q425 432 414 453Q398 427 403 392Z" fill="#e8dfc0" stroke="#a5956e" stroke-width="3"/>
+      <path d="M402 384 408 383M422 382 428 383M376 451 388 471 377 521M445 460 435 497"/>
+      <path d="M503 416Q481 423 467 466L460 577 480 633 554 620 575 485Q554 423 536 417Z" fill="#ac803c"/>
+      <path d="M513 425 488 471 503 597 520 624 534 603 528 467 540 426Z" fill="#3c725d"/>
+      <path d="M504 374Q520 359 539 375L538 410 521 427 505 413Z" fill="#e8bd7d"/>
+      <path d="M500 380 499 364 510 358 510 345 533 345 534 358 545 365 543 380 525 374Z" fill="#2a4034"/>
+      <path d="M505 352 488 352 482 363M537 352 554 352 560 363" stroke="#d8b35b" stroke-width="5"/>
+      <path d="M511 400 524 405 535 399Q538 430 523 453Q506 432 511 400Z" fill="#303a2e"/>
+      <path d="M510 390 515 388M529 388 534 390M481 470 490 510M550 469 543 527"/>
+      <path d="M592 452Q617 451 641 485L650 567 625 652 567 645 570 506Z" fill="#b78247"/>
+      <path d="M603 466 588 501 596 572 575 633 605 645 625 566 617 509Z" fill="#dfb570"/>
+      <path d="M589 421Q604 407 620 421L624 447Q613 468 597 458L584 442Z" fill="#edc58b"/>
+      <path d="M585 433Q579 418 594 411Q594 399 607 403Q618 401 624 414L628 439 617 438 612 420 593 426Z" fill="#3b3b2b"/>
+      <path d="M594 435 599 435M609 432 614 431M603 447 613 444M630 483 615 510 601 510"/>
+      <path d="M450 488Q429 493 419 534L408 605 429 650 418 710 469 718 511 701 521 622 509 551Q494 503 478 491Z" fill="#d27b3e"/>
+      <path d="M453 501Q436 523 441 571Q458 604 485 571L481 514 491 505 510 573 490 638 504 694 480 700 463 648 443 702 428 704 446 632 425 588Z" fill="#dda56b"/>
+      <path d="M447 455Q463 440 479 454L483 479 471 501 449 491 443 472Z" fill="#edc48b"/>
+      <path d="M443 465Q432 450 443 442Q448 426 466 436Q484 433 488 451L479 461 473 447 449 451Z" fill="#315950"/>
+      <path d="M449 480 459 476 466 481 475 476M454 488Q463 483 472 489L466 504 457 501Z" fill="#463b29"/>
+      <path d="M449 465 454 464M467 463 473 464M448 544Q460 551 479 541M431 587 444 608M498 589 485 614"/>
+      <path d="M545 563Q528 570 519 604L510 653 529 677 533 714 554 724 587 712 585 661 591 610Q578 573 565 565Z" fill="#4b8161"/>
+      <path d="M547 576 539 628 548 650 538 707 552 714 562 654 578 704 585 709 577 636 568 581Z" fill="#bda45a"/>
+      <path d="M541 539Q554 525 568 540L569 562Q558 580 544 568L537 552Z" fill="#e5be81"/>
+      <path d="M539 545Q530 539 537 529L548 530 554 522 567 528 573 540 566 546 560 534 544 538Z" fill="#3c4130"/>
+      <path d="M544 549 549 549M558 546 563 547M550 560 558 558M527 608 540 620M580 608 568 625"/>
+    </g>
+    <path d="M347 678 365 647 383 658 394 637 415 665 421 704 367 706Z" fill="#3f766c" stroke="#35544a" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M367 692 375 667 383 672 397 656 405 693" stroke="#739684" stroke-width="4" stroke-linecap="round"/>
+    <g>
+      <use href="#peony" transform="translate(475 721) scale(.5)"/>
+      <use href="#peony" transform="translate(510 733) scale(.45)"/>
+      <use href="#peony" transform="translate(582 701) scale(.45)"/>
+      <use href="#peony" transform="translate(610 687) scale(.34)"/>
+    </g>
+    <use href="#silhouette" stroke="#c05330" stroke-width="8" stroke-linejoin="round"/>
+  </g>
+</svg>

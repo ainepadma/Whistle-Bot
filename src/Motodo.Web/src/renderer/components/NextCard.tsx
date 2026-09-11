@@ -1,21 +1,23 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import type { Event } from '@shared/types/event'
 import FocusCard from '@/components/FocusCard'
 import { useEventUiStore } from '@/stores/event-ui.store'
+import { isRecurringEvent } from '@/utils/recurrence'
 
 /** The action card deliberately limits each list: it is a decision surface, not a second dashboard. */
 export default function NextCard(): JSX.Element {
     const [todos, setTodos] = useState<Event[]>([])
     const [upcoming, setUpcoming] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
-    const contentRef = useRef<HTMLElement>(null)
     const openCreate = useEventUiStore((state) => state.openCreate)
     const openDetail = useEventUiStore((state) => state.openDetail)
 
     useEffect(() => {
         let mounted = true
+        let revision = 0
         const load = async () => {
+            const request = ++revision
             setLoading(true)
             try {
                 const now = dayjs()
@@ -26,14 +28,16 @@ export default function NextCard(): JSX.Element {
                     }) as Promise<Event[]>,
                     window.electronAPI.event.query({ start: now.toISOString(), end: now.add(12, 'hour').toISOString() }) as Promise<Event[]>
                 ])
-                if (!mounted) return
+                if (!mounted || request !== revision) return
                 setTodos(allTodos.sort((a, b) => a.start_at.localeCompare(b.start_at)).slice(0, 3))
                 setUpcoming(planned
                     .filter((event) => event.item_type !== 'todo' && !event.is_completed)
                     .sort((a, b) => a.start_at.localeCompare(b.start_at))
                     .slice(0, 2))
+            } catch {
+                // Keep the last result during transient host failures; the next refresh retries.
             } finally {
-                if (mounted) setLoading(false)
+                if (mounted && request === revision) setLoading(false)
             }
         }
         void load()
@@ -42,33 +46,18 @@ export default function NextCard(): JSX.Element {
         return () => { mounted = false; window.clearInterval(timer); unsubscribe() }
     }, [])
 
-    useLayoutEffect(() => {
-        const element = contentRef.current
-        if (!element) return
-        let frame = 0
-        const resize = () => {
-            cancelAnimationFrame(frame)
-            frame = requestAnimationFrame(() => {
-                void window.electronAPI.card.resize('next', 390, Math.ceil(element.scrollHeight + 44))
-            })
-        }
-        const observer = new ResizeObserver(resize)
-        observer.observe(element)
-        resize()
-        return () => { observer.disconnect(); cancelAnimationFrame(frame) }
-    }, [])
     const completeTodo = async (event: Event) => {
+        if (isRecurringEvent(event)) { openDetail(event); return }
         await window.electronAPI.event.update(event.id, { is_completed: true })
     }
 
     const openFocusedEvent = async (eventId: string) => {
-        const events = await window.electronAPI.event.query({ start: '2000-01-01T00:00:00.000Z', end: '2100-01-01T00:00:00.000Z', expand: false }) as Event[]
-        const event = events.find((item) => item.id === eventId)
+        const event = await window.electronAPI.event.getById(eventId) as Event | null
         if (event) openDetail(event)
     }
 
     return (
-        <section ref={contentRef} className="mx-3 my-3 rounded-xl border border-slate-200/90 bg-white p-3 shadow-[0_2px_8px_rgba(15,23,42,0.04)] dark:border-zinc-800 dark:bg-zinc-950">
+        <section className="desktop-card-panel ui-card overflow-y-auto">
             <FocusCard cardKind="next" autoResize={false} onOpenEvent={(eventId) => void openFocusedEvent(eventId)} />
 
             <div className="mt-1 border-t border-zinc-100 pt-2 dark:border-zinc-800">
@@ -80,7 +69,7 @@ export default function NextCard(): JSX.Element {
                     <p className="rounded-md bg-zinc-50 px-2 py-1.5 text-[10px] text-zinc-400 dark:bg-zinc-900">没有待完成事项</p>
                 ) : <div className="space-y-1">{todos.map((event) => (
                     <div key={event.id} className="flex items-center gap-2 rounded-md border border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
-                        <button onClick={() => void completeTodo(event)} aria-label={`完成 ${event.title}`} className="h-3.5 w-3.5 shrink-0 rounded border border-amber-400 hover:bg-amber-400" />
+                        <button onClick={() => void completeTodo(event)} aria-label={`${isRecurringEvent(event) ? '处理整个重复待办' : '完成'} ${event.title}`} title={isRecurringEvent(event) ? '打开详情，确认操作整个重复待办' : undefined} className="h-3.5 w-3.5 shrink-0 rounded border border-amber-400 hover:bg-amber-400" />
                         <button onClick={() => openDetail(event)} className="min-w-0 flex-1 truncate text-left text-[11px] font-medium hover:text-primary-600">{event.title}</button>
                         <span className="shrink-0 text-[9px] text-amber-600 dark:text-amber-300">{event.is_all_day ? dayjs(event.start_at).format('M/D') : dayjs(event.start_at).format('HH:mm')}</span>
                     </div>

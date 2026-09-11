@@ -11,5 +11,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\PetApp\PetApp.csproj" />
+    <Compile Include="..\Bootstrap\RuntimeDiscovery.cs" Link="Bootstrap\RuntimeDiscovery.cs" />
   </ItemGroup>
 </Project>

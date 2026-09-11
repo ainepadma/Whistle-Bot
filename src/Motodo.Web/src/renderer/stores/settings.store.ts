@@ -6,7 +6,6 @@ export type TimeFormat = '12h' | '24h'
 export type DefaultView = 'month' | 'week' | 'day'
 
 const STORAGE_KEY = 'banyao.schedule.settings.v1'
-const LEGACY_STORAGE_KEY = 'motodo.settings.v2'
 
 interface PersistedSettings {
     theme: Theme
@@ -40,7 +39,11 @@ function loadSettings(): PersistedSettings {
     try {
         const raw = localStorage.getItem(STORAGE_KEY)
         if (!raw) return { ...DEFAULT_SETTINGS }
-        const parsed = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<PersistedSettings>) }
+        const saved = JSON.parse(raw) as Partial<PersistedSettings>
+        const parsed = { ...DEFAULT_SETTINGS }
+        for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof PersistedSettings)[]) {
+            if (key in saved) Object.assign(parsed, { [key]: saved[key] })
+        }
         // 统一为单一「每日起始时间」：结束时间自动取起始前一分钟（跨午夜）
         parsed.dayEnd = subtractMinutesFromTime(parsed.dayStart, 1)
         return parsed
@@ -51,7 +54,8 @@ function loadSettings(): PersistedSettings {
 
 function saveSettings(s: PersistedSettings): void {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
+        const persisted = Object.fromEntries(Object.keys(DEFAULT_SETTINGS).map((key) => [key, s[key as keyof PersistedSettings]]))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
     } catch {
         // 存储不可用时忽略
     }
@@ -158,4 +162,12 @@ applyTheme(initial.theme)
 // 系统主题变化时跟随（仅在“跟随系统”模式下）
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (useSettingsStore.getState().theme === 'system') applyTheme('system')
+})
+
+// Each desktop card has its own store. Apply external writes without broadcasting again.
+window.addEventListener('storage', (event) => {
+    if (event.key !== STORAGE_KEY && event.key !== null) return
+    const next = loadSettings()
+    useSettingsStore.setState(next)
+    applyTheme(next.theme)
 })
