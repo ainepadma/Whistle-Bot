@@ -25,7 +25,10 @@ internal static class WindowsIntegrationAcceptance
              !WindowsIntegration.RegisteredUninstallerMatches(app, null, command),
             "Windows uninstall: unrelated or missing installation records are rejected");
 
-        const string url = "https://ainepadma.cn/soundflyinggallery/sound/desktop-pet/#download";
+        const string url = "https://kitechant.cn/sound/desktop-pet/#download";
+        pass(UpdateService.ManifestUrl == "https://kitechant.cn/sound/desktop-pet/version.yml" &&
+             UpdateService.DefaultDownloadUrl == url,
+            "Update service uses the public kitechant manifest and download page");
         pass(UpdateService.ReadValue("download_url: " + url + " # release page", "download_url") == url,
             "Update manifest: URL fragment survives while a trailing comment is removed");
         pass(UpdateService.ReadValue("download_url: \"" + url + "\" # release page", "download_url") == url &&

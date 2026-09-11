@@ -67,11 +67,11 @@ Preview v1.3.0 新增六角板鹞与九连星板鹞双击动画，统一行动�
 
 将随构建输出的 `dist/version.yml` 上传到：
 
-`https://ainepadma.cn/soundflyinggallery/sound/desktop-pet/version.yml`
+`https://kitechant.cn/sound/desktop-pet/version.yml`
 
 清单中的 `version: 1.3.0` 用于兼容现有客户端版本比较，`display_version: Preview v1.3.0` 标记预览版名称。安装包、绿色包与下载页准备完成后再上传清单。下载页固定为：
 
-`https://ainepadma.cn/soundflyinggallery/sound/desktop-pet/#download`
+`https://kitechant.cn/sound/desktop-pet/#download`
 
 ## 系统要求
 

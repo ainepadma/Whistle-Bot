@@ -9,8 +9,8 @@ namespace PetApp;
 /// <summary>Checks the public release manifest without downloading or replacing binaries automatically.</summary>
 internal sealed class UpdateService
 {
-    internal const string ManifestUrl = "https://ainepadma.cn/soundflyinggallery/sound/desktop-pet/version.yml";
-    internal const string DefaultDownloadUrl = "https://ainepadma.cn/soundflyinggallery/sound/desktop-pet/#download";
+    internal const string ManifestUrl = "https://kitechant.cn/sound/desktop-pet/version.yml";
+    internal const string DefaultDownloadUrl = "https://kitechant.cn/sound/desktop-pet/#download";
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(6) };
 
     public async Task CheckAsync(IWin32Window owner, bool interactive)
@@ -56,7 +56,7 @@ internal sealed class UpdateService
         var download = ReadValue(yaml, "download_url") ?? DefaultDownloadUrl;
         if (!Uri.TryCreate(download, UriKind.Absolute, out var uri) ||
             !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
-            !uri.Host.Equals("ainepadma.cn", StringComparison.OrdinalIgnoreCase))
+            !uri.Host.Equals("kitechant.cn", StringComparison.OrdinalIgnoreCase))
         {
             download = DefaultDownloadUrl;
         }

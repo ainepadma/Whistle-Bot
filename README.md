@@ -183,7 +183,7 @@ Windows 回归另外覆盖：运行时架构与版本检测、自启动及卸载
 
 构建后会在 `dist\version.yml` 生成版本清单。将该文件上传到：
 
-`https://ainepadma.cn/soundflyinggallery/sound/desktop-pet/version.yml`
+`https://kitechant.cn/sound/desktop-pet/version.yml`
 
 应用会在启动和手动点击“设置 → 检查更新”时读取该文件；当 `version` 高于本地版本时，引导用户前往 `#download` 下载新版本。
 

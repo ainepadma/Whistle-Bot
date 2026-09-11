@@ -783,7 +783,7 @@ public sealed class MainForm : Form, IScheduleDesktopHost
     {
         try
         {
-            Process.Start(new ProcessStartInfo("https://ainepadma.cn/soundflyinggallery/sound/desktop-pet/")
+            Process.Start(new ProcessStartInfo("https://kitechant.cn/sound/desktop-pet/")
             {
                 UseShellExecute = true
             });
