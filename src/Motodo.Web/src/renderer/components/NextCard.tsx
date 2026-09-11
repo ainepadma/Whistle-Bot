@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import type { Event } from '@shared/types/event'
 import FocusCard from '@/components/FocusCard'
+import Icon from '@/components/ui/Icons'
 import { useEventUiStore } from '@/stores/event-ui.store'
 import { isRecurringEvent } from '@/utils/recurrence'
 
@@ -10,6 +11,8 @@ export default function NextCard(): JSX.Element {
     const [todos, setTodos] = useState<Event[]>([])
     const [upcoming, setUpcoming] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
+    const [todosExpanded, setTodosExpanded] = useState(false)
+    const [upcomingExpanded, setUpcomingExpanded] = useState(false)
     const openCreate = useEventUiStore((state) => state.openCreate)
     const openDetail = useEventUiStore((state) => state.openDetail)
 
@@ -62,33 +65,59 @@ export default function NextCard(): JSX.Element {
 
             <div className="mt-1 border-t border-zinc-100 pt-2 dark:border-zinc-800">
                 <div className="mb-1.5 flex items-center justify-between">
-                    <p className="text-[11px] font-medium text-zinc-500">待完成</p>
+                    <button
+                        type="button"
+                        aria-expanded={todosExpanded}
+                        aria-controls="action-pending-items"
+                        onClick={() => setTodosExpanded((expanded) => !expanded)}
+                        className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    >
+                        <Icon name={todosExpanded ? 'chevron-up' : 'chevron-down'} className="h-3 w-3" />
+                        待完成
+                    </button>
                     <button onClick={() => openCreate('todo')} className="rounded px-1.5 py-0.5 text-[10px] font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-950/40">+ 待办</button>
                 </div>
-                {loading ? <div className="h-8 animate-pulse rounded-md bg-zinc-50 dark:bg-zinc-900" /> : todos.length === 0 ? (
-                    <p className="rounded-md bg-zinc-50 px-2 py-1.5 text-[10px] text-zinc-400 dark:bg-zinc-900">没有待完成事项</p>
-                ) : <div className="space-y-1">{todos.map((event) => (
-                    <div key={event.id} className="flex items-center gap-2 rounded-md border border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
-                        <button onClick={() => void completeTodo(event)} aria-label={`${isRecurringEvent(event) ? '处理整个重复待办' : '完成'} ${event.title}`} title={isRecurringEvent(event) ? '打开详情，确认操作整个重复待办' : undefined} className="h-3.5 w-3.5 shrink-0 rounded border border-amber-400 hover:bg-amber-400" />
-                        <button onClick={() => openDetail(event)} className="min-w-0 flex-1 truncate text-left text-[11px] font-medium hover:text-primary-600">{event.title}</button>
-                        <span className="shrink-0 text-[9px] text-amber-600 dark:text-amber-300">{event.is_all_day ? dayjs(event.start_at).format('M/D') : dayjs(event.start_at).format('HH:mm')}</span>
+                {todosExpanded && (
+                    <div id="action-pending-items">
+                        {loading ? <div className="h-8 animate-pulse rounded-md bg-zinc-50 dark:bg-zinc-900" /> : todos.length === 0 ? (
+                            <p className="rounded-md bg-zinc-50 px-2 py-1.5 text-[10px] text-zinc-400 dark:bg-zinc-900">没有待完成事项</p>
+                        ) : <div className="space-y-1">{todos.map((event) => (
+                            <div key={event.id} className="flex items-center gap-2 rounded-md border border-zinc-100 px-2 py-1.5 dark:border-zinc-800">
+                                <button onClick={() => void completeTodo(event)} aria-label={`${isRecurringEvent(event) ? '处理整个重复待办' : '完成'} ${event.title}`} title={isRecurringEvent(event) ? '打开详情，确认操作整个重复待办' : undefined} className="h-3.5 w-3.5 shrink-0 rounded border border-amber-400 hover:bg-amber-400" />
+                                <button onClick={() => openDetail(event)} className="min-w-0 flex-1 truncate text-left text-[11px] font-medium hover:text-primary-600">{event.title}</button>
+                                <span className="shrink-0 text-[9px] text-amber-600 dark:text-amber-300">{event.is_all_day ? dayjs(event.start_at).format('M/D') : dayjs(event.start_at).format('HH:mm')}</span>
+                            </div>
+                        ))}</div>}
                     </div>
-                ))}</div>}
+                )}
             </div>
 
             <div className="mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800">
                 <div className="mb-1.5 flex items-center justify-between">
-                    <p className="text-[11px] font-medium text-zinc-500">即将开始</p>
+                    <button
+                        type="button"
+                        aria-expanded={upcomingExpanded}
+                        aria-controls="action-upcoming-items"
+                        onClick={() => setUpcomingExpanded((expanded) => !expanded)}
+                        className="flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    >
+                        <Icon name={upcomingExpanded ? 'chevron-up' : 'chevron-down'} className="h-3 w-3" />
+                        即将开始
+                    </button>
                     <button onClick={() => openCreate('plan')} className="rounded px-1.5 py-0.5 text-[10px] font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-950/40">+ 计划</button>
                 </div>
-                {loading ? <div className="h-8 animate-pulse rounded-md bg-zinc-50 dark:bg-zinc-900" /> : upcoming.length === 0 ? (
-                    <p className="rounded-md bg-zinc-50 px-2 py-1.5 text-[10px] text-zinc-400 dark:bg-zinc-900">未来 12 小时没有安排</p>
-                ) : <div className="space-y-1">{upcoming.map((event) => (
-                    <button key={event.id} onClick={() => openDetail(event)} className="flex w-full items-center gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-left hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900">
-                        <span className="w-9 shrink-0 text-[10px] font-medium text-primary-600 dark:text-primary-300">{event.is_all_day ? '全天' : dayjs(event.start_at).format('HH:mm')}</span>
-                        <span className="min-w-0 flex-1 truncate text-[11px] font-medium">{event.title}</span>
-                    </button>
-                ))}</div>}
+                {upcomingExpanded && (
+                    <div id="action-upcoming-items">
+                        {loading ? <div className="h-8 animate-pulse rounded-md bg-zinc-50 dark:bg-zinc-900" /> : upcoming.length === 0 ? (
+                            <p className="rounded-md bg-zinc-50 px-2 py-1.5 text-[10px] text-zinc-400 dark:bg-zinc-900">未来 12 小时没有安排</p>
+                        ) : <div className="space-y-1">{upcoming.map((event) => (
+                            <button key={event.id} onClick={() => openDetail(event)} className="flex w-full items-center gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-left hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900">
+                                <span className="w-9 shrink-0 text-[10px] font-medium text-primary-600 dark:text-primary-300">{event.is_all_day ? '全天' : dayjs(event.start_at).format('HH:mm')}</span>
+                                <span className="min-w-0 flex-1 truncate text-[11px] font-medium">{event.title}</span>
+                            </button>
+                        ))}</div>}
+                    </div>
+                )}
             </div>
         </section>
     )

@@ -212,9 +212,19 @@ test('action card keeps its native size as content refreshes and disables nested
     h.render(Card, {})
     h.effects()
     await flush()
-    const tree = h.render(Card, {})
+    let tree = h.render(Card, {})
     assert.equal(elements(tree, node => node.props?.cardKind === 'next')[0].props.autoResize, false)
     assert.equal(requested.length, 0)
+
+    const sectionToggles = elements(tree, node => node.type === 'button' && node.props?.['aria-controls']?.startsWith('action-'))
+    assert.deepEqual(sectionToggles.map(node => node.props['aria-expanded']), [false, false])
+    assert.equal(elements(tree, node => node.props?.id === 'action-pending-items').length, 0)
+    assert.equal(elements(tree, node => node.props?.id === 'action-upcoming-items').length, 0)
+
+    sectionToggles[0].props.onClick()
+    tree = h.render(Card, {})
+    assert.equal(elements(tree, node => node.props?.id === 'action-pending-items').length, 1)
+    assert.equal(elements(tree, node => node.props?.id === 'action-upcoming-items').length, 0)
     h.cleanup()
 })
 
